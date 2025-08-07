@@ -19,6 +19,19 @@ from datetime import datetime
 # Add the 'src' directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
 
+# Set default environment variables for distributed training if not already set
+# This enables running without torchrun for single-GPU training
+if "RANK" not in os.environ:
+    os.environ["RANK"] = "0"
+if "WORLD_SIZE" not in os.environ:
+    os.environ["WORLD_SIZE"] = "1"
+if "LOCAL_RANK" not in os.environ:
+    os.environ["LOCAL_RANK"] = "0"
+if "MASTER_ADDR" not in os.environ:
+    os.environ["MASTER_ADDR"] = "localhost"
+if "MASTER_PORT" not in os.environ:
+    os.environ["MASTER_PORT"] = "29500"
+
 # Configure infini attention
 from dataclasses import dataclass, field
 
@@ -251,24 +264,54 @@ class CustomDistributedTrainer(DistributedTrainer):
         """Override train method to include TensorBoard logging."""
         last_log_time = time.time()
         
-        for step, batch, loss in super().train(dataloader):
-            current_time = time.time()
-            
-            # Calculate throughput (samples per second)
-            elapsed = current_time - last_log_time
-            if elapsed > 0:  # Avoid division by zero
-                throughput = self.micro_batch_size / elapsed
-            else:
-                throughput = 0
+        try:
+            for step, batch, loss in super().train(dataloader):
+                current_time = time.time()
                 
-            # Get current learning rate
-            current_lr = self.optimizer.param_groups[0]["lr"] if hasattr(self, "optimizer") else None
-            
-            # Log to TensorBoard
-            self.tensorboard_callback.on_step_end(step, loss, current_lr, throughput)
-            
-            # Update time for next iteration
-            last_log_time = current_time
+                # Calculate throughput (samples per second)
+                elapsed = current_time - last_log_time
+                if elapsed > 0:  # Avoid division by zero
+                    throughput = self.micro_batch_size / elapsed
+                else:
+                    throughput = 0
+                    
+                # Get current learning rate
+                current_lr = self.optimizer.param_groups[0]["lr"] if hasattr(self, "optimizer") else None
+                
+                # Log to TensorBoard
+                self.tensorboard_callback.on_step_end(step, loss, current_lr, throughput)
+                
+                # Update time for next iteration
+                last_log_time = current_time
+        except Exception as e:
+            print(f"Error during training: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            # Close TensorBoard writer before propagating the error
+            if hasattr(self, "tensorboard_callback"):
+                self.tensorboard_callback.close()
+            raise
+
+
+def init_distributed_environment():
+    """Initialize the distributed environment if environment variables are not properly set.
+    This allows the script to be run directly without using torchrun or similar launcher.
+    """
+    if "WORLD_SIZE" not in os.environ or "RANK" not in os.environ:
+        print("Initializing single-GPU environment for training...")
+        os.environ["RANK"] = "0"
+        os.environ["WORLD_SIZE"] = "1"
+        os.environ["LOCAL_RANK"] = "0"
+        os.environ["MASTER_ADDR"] = "localhost"
+        os.environ["MASTER_PORT"] = "29500"
+    
+    # Print environment details for debugging
+    print(f"Distributed training environment:")
+    print(f"  RANK: {os.environ.get('RANK', 'Not set')}")
+    print(f"  WORLD_SIZE: {os.environ.get('WORLD_SIZE', 'Not set')}")
+    print(f"  LOCAL_RANK: {os.environ.get('LOCAL_RANK', 'Not set')}")
+    print(f"  MASTER_ADDR: {os.environ.get('MASTER_ADDR', 'Not set')}")
+    print(f"  MASTER_PORT: {os.environ.get('MASTER_PORT', 'Not set')}")
 
 
 def get_args():
@@ -279,6 +322,9 @@ def get_args():
 
 
 if __name__ == "__main__":
+    # Initialize distributed environment before importing any torch.distributed modules
+    init_distributed_environment()
+    
     args = get_args()
     config_file = args.config_file
     
