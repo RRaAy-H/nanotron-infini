@@ -306,6 +306,17 @@ If you encounter errors:
 4. **GPU Compatibility**: Ensure your GPU drivers are up-to-date and compatible with PyTorch
 5. **CUDA Errors**: Check CUDA toolkit installation and environment variables
 6. **Dataset Issues**: Verify the dataset is properly processed in `/data/processed`
-7. **TensorBoard Problems**: Check port availability (default: 6006) and file permissions
+7. **TensorBoard Problems**: 
+   - If you see "TensorBoard could not bind to port 6006", the port is already in use. The script will now try the next available port automatically.
+   - You can manually specify a different port: `tensorboard --logdir=tensorboard_logs --port=6007`
+
+8. **Tokenizer Issues**:
+   - If you see errors about invalid repository IDs like `HFValidationError: Repo id must be in the form 'repo_name'`, the tokenizer path is invalid
+   - Check that you have access to the specified HuggingFace model (e.g., "meta-llama/Llama-2-7b-hf")
+   - For Llama models, you may need to request access on the HuggingFace website first
+
+9. **Path Issues**:
+   - If you see file not found errors, check that all paths in config files match your actual directory structure
+   - The training script now uses environment variables for better path handling
 
 For more troubleshooting details, see TRAINING_GUIDE.md.

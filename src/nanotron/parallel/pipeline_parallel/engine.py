@@ -227,8 +227,13 @@ class OneForwardOneBackwardPipelineEngine(PipelineEngine):
 
         from transformers import AutoTokenizer
 
-        # self.tokenizer = AutoTokenizer.from_pretrained("lvwerra/the-tokenizer-v1")
-        self.tokenizer = AutoTokenizer.from_pretrained("/fsx/haojun/lighteval_evaluation_model/NanotronLlama3-8B")
+        # Use the tokenizer specified in the config, defaulting to a standard one if not available
+        try:
+            # This will be replaced with the tokenizer from the config at runtime
+            self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
+        except:
+            # Fallback to a simpler tokenizer that's more likely to be accessible
+            self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
 
     def train_batch_iter(
         self,

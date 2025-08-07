@@ -1,5 +1,5 @@
+Requirement already satisfied: torch in /Users/zhang/miniconda3/envs/infi-llama/lib/python3.10/site-packages (2.8.0)
 Collecting flash-attn
-  Downloading flash_attn-2.8.2.tar.gz (8.2 MB)
-     ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 8.2/8.2 MB 1.8 MB/s eta 0:00:00
+  Using cached flash_attn-2.8.2.tar.gz (8.2 MB)
   Preparing metadata (setup.py): started
   Preparing metadata (setup.py): finished with status 'error'

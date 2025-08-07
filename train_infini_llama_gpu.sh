@@ -6,12 +6,16 @@
 
 # Default values
 GPU_ID=${1:-0}  # Default to GPU 0 if not specified
-TENSORBOARD_DIR=${2:-"/Users/zhang/Desktop/huawei/infi_llama/nanotron-infini/tensorboard_logs"}  # Default directory for TensorBoard logs
+# Set NANOTRON_ROOT to the script's directory for consistent path handling
+export NANOTRON_ROOT=$(cd "$(dirname "$0")" && pwd)
+TENSORBOARD_DIR=${2:-"$NANOTRON_ROOT/tensorboard_logs"}  # Default directory for TensorBoard logs
 CONFIG_FILE="custom_infini_config_gpu.yaml"
 
 # Set environment variables
 export CUDA_VISIBLE_DEVICES=$GPU_ID
 export CUDA_DEVICE_MAX_CONNECTIONS=1
+
+echo "Set NANOTRON_ROOT to: $NANOTRON_ROOT"
 
 # Create TensorBoard directory if it doesn't exist
 mkdir -p $TENSORBOARD_DIR
@@ -30,19 +34,26 @@ pip install -e . 2>/dev/null || echo "nanotron already installed"
 pip install torch>=1.13.1 flash-attn>=2.5.0 datasets transformers huggingface_hub pyarrow pandas tensorboard torchvision tqdm
 
 # Check if data is prepared
-if [ ! -d "/Users/zhang/Desktop/huawei/infi_llama/nanotron-infini/data/processed" ]; then
+if [ ! -d "$NANOTRON_ROOT/data/processed" ]; then
   echo "Preparing dataset..."
-  python prepare_data.py
+  python $NANOTRON_ROOT/prepare_data.py
 else
   echo "Dataset already prepared."
 fi
 
-# Start TensorBoard in the background
+# Start TensorBoard in the background with dynamic port selection
 echo "Starting TensorBoard..."
-tensorboard --logdir=$TENSORBOARD_DIR --port=6006 &
+# Find an available port starting from 6006
+TB_PORT=6006
+while netstat -tuln | grep -q ":$TB_PORT "; do
+  echo "Port $TB_PORT is in use, trying next port..."
+  TB_PORT=$((TB_PORT+1))
+done
+
+tensorboard --logdir=$TENSORBOARD_DIR --port=$TB_PORT &
 TENSORBOARD_PID=$!
 echo "TensorBoard started with PID: $TENSORBOARD_PID"
-echo "View TensorBoard at http://localhost:6006"
+echo "View TensorBoard at http://localhost:$TB_PORT"
 
 # Wait a moment for TensorBoard to start
 sleep 3
