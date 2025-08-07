@@ -1,0 +1,97 @@
+checkpoints:
+  checkpoint_interval: 5000
+  checkpoints_path: /Users/zhang/Desktop/huawei/infi_llama/nanotron-infini/checkpoints
+  checkpoints_path_is_shared_file_system: false
+  resume_checkpoint_path: null
+  save_initial_state: false
+general:
+  benchmark_csv_path: null
+  consumed_train_samples: null
+  ignore_sanity_checks: true
+  project: custom_infini_attention
+  run: custom_infini_llama_cpu_%date_%jobid
+  seed: 42
+  step: null
+logging:
+  iteration_step_info_interval: 1
+  log_level: info
+  log_level_replica: info
+# infini_attention parameters are set through constants.py
+model:
+  ddp_bucket_cap_mb: 120
+  dtype: float32  # Changed from bfloat16 for CPU compatibility
+  init_method:
+    std: 0.03125
+  make_vocab_size_divisible_by: 1
+  model_config:
+    bos_token_id: 1
+    eos_token_id: 2
+    hidden_act: silu
+    hidden_size: 256  # Reduced size for CPU training
+    initializer_range: 0.02
+    intermediate_size: 512  # Reduced size for CPU training
+    num_hidden_layers: 2  # Reduced size for CPU training
+    is_llama_config: true
+    max_position_embeddings: 128
+    num_attention_heads: 4  # Reduced size for CPU training
+    num_key_value_heads: 4  # Reduced size for CPU training
+    pad_token_id: null
+    pretraining_tp: 1
+    rms_norm_eps: 1.0e-05
+    rope_scaling: null
+    rope_theta: 10000.0
+    rope_interleaved: false
+    tie_word_embeddings: false
+    use_cache: true
+    vocab_size: 32000
+optimizer:
+  accumulate_grad_in_fp32: true
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_eps: 1.0e-08
+  clip_grad: 1.0
+  learning_rate_scheduler:
+    learning_rate: 0.0001
+    lr_decay_starting_step: null
+    lr_decay_steps: null
+    lr_decay_style: cosine
+    lr_warmup_steps: 100  # Reduced for faster training
+    lr_warmup_style: linear
+    min_decay_lr: 1.0e-05
+  torch_adam_is_fused: false  # Changed for CPU compatibility
+  weight_decay: 0.1
+  zero_stage: 0
+parallelism:
+  dp: 1
+  expert_parallel_size: 1
+  pp: 1
+  pp_engine: 1f1b
+  tp: 1
+  tp_linear_async_communication: false
+  tp_mode: ALL_REDUCE
+data_stages:
+  - name: Training Stage
+    start_training_step: 1
+    data:
+      dataset:
+        dataset_overwrite_cache: false
+        dataset_processing_num_proc_per_process: 1
+        hf_dataset_config_name: null
+        hf_dataset_or_datasets: /Users/zhang/Desktop/huawei/infi_llama/nanotron-infini/data/processed
+        hf_dataset_splits: "train,validation"  # Changed from just "train"
+        text_column_name: text
+      num_loading_workers: 1
+      seed: 42
+tokenizer:
+  tokenizer_max_length: null
+  tokenizer_name_or_path: gpt2  # Changed from meta-llama for easier access
+  tokenizer_revision: null
+tokens:
+  batch_accumulation_per_replica: 1
+  limit_test_batches: 0
+  limit_val_batches: 0
+  micro_batch_size: 1  # Reduced for CPU
+  sequence_length: 64  # Reduced for CPU
+  train_steps: 100  # Reduced for testing
+  val_check_interval: -1
+profiler: null
