@@ -21,6 +21,7 @@ infini_attention:
   turn_on_memory: true
   balance_init_type: zeros
   balance_act_type: orig_sigmoid
+  balance_factor_lr: 0.001  # Added missing required parameter
 model:
   ddp_bucket_cap_mb: 120
   dtype: bfloat16

@@ -16,7 +16,13 @@ logging:
   iteration_step_info_interval: 1
   log_level: info
   log_level_replica: info
-# infini_attention parameters are set through constants.py
+# Add the infini_attention parameters here for clarity and consistency
+infini_attention:
+  segment_length: 64
+  turn_on_memory: true
+  balance_init_type: zeros
+  balance_act_type: orig_sigmoid
+  balance_factor_lr: 0.001  # Added required parameter
 model:
   ddp_bucket_cap_mb: 120
   dtype: float32  # Changed from bfloat16 for CPU compatibility

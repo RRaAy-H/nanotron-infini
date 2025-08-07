@@ -7,6 +7,7 @@ class InfiniAttentionConfig:
     turn_on_memory: bool = True
     balance_init_type: str = "zeros"
     balance_act_type: str = "orig_sigmoid"
+    balance_factor_lr: float = 0.001  # Added missing required parameter
 
 @dataclass
 class Config:
