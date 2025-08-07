@@ -23,6 +23,10 @@ infini_attention:
   balance_init_type: zeros
   balance_act_type: orig_sigmoid
   balance_factor_lr: 0.001  # Added required parameter
+  logging: false  # Added missing required parameter
+  logging_interval: 100  # Added missing required parameter
+  log_grad: false  # Added missing required parameter
+  log_segment_acts: false  # Added missing required parameter
 model:
   ddp_bucket_cap_mb: 120
   dtype: float32  # Changed from bfloat16 for CPU compatibility

@@ -75,6 +75,11 @@ The Infi-Attention model is configured with:
 - Memory enabled: True
 - Balance initialization: zeros
 - Balance activation: orig_sigmoid
+- Balance factor learning rate: 0.001
+- Logging: False
+- Logging interval: 100
+- Log gradient: False
+- Log segment activations: False
 
 ## Modifying Model Size
 
@@ -173,6 +178,11 @@ The GPU configuration file (`custom_infini_config_gpu.yaml`) is optimized for mo
   - `turn_on_memory: true`
   - `balance_init_type: zeros`
   - `balance_act_type: orig_sigmoid`
+  - `balance_factor_lr: 0.001`
+  - `logging: false`
+  - `logging_interval: 100`
+  - `log_grad: false`
+  - `log_segment_acts: false`
 
 #### 3. Training Hyperparameters
 - **Batch Size**: Increased `micro_batch_size: 4` for better GPU utilization

@@ -102,15 +102,25 @@ def main():
         balance_init_type = infini_attention.get("balance_init_type")
         balance_act_type = infini_attention.get("balance_act_type")
         balance_factor_lr = infini_attention.get("balance_factor_lr")
+        logging = infini_attention.get("logging")
+        logging_interval = infini_attention.get("logging_interval")
+        log_grad = infini_attention.get("log_grad")
+        log_segment_acts = infini_attention.get("log_segment_acts")
         
         print(f"  - segment_length: {segment_length}")
         print(f"  - turn_on_memory: {turn_on_memory}")
         print(f"  - balance_init_type: {balance_init_type}")
         print(f"  - balance_act_type: {balance_act_type}")
         print(f"  - balance_factor_lr: {balance_factor_lr}")
+        print(f"  - logging: {logging}")
+        print(f"  - logging_interval: {logging_interval}")
+        print(f"  - log_grad: {log_grad}")
+        print(f"  - log_segment_acts: {log_segment_acts}")
         
         if balance_factor_lr is None:
             print("  - Warning: Missing required parameter 'balance_factor_lr'")
+        if logging is None:
+            print("  - Warning: Missing required parameter 'logging'")
     else:
         print("Warning: No infini_attention section in config")
     
