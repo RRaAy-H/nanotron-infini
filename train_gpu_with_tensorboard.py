@@ -318,6 +318,7 @@ def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--config-file", type=str, required=True, help="Path to the YAML or python config file")
     parser.add_argument("--tensorboard-dir", type=str, default="tensorboard_logs", help="Directory for TensorBoard logs")
+    parser.add_argument("--disable-flash-attn", action="store_true", help="Disable Flash Attention and use standard attention")
     return parser.parse_args()
 
 
@@ -327,6 +328,11 @@ if __name__ == "__main__":
     
     args = get_args()
     config_file = args.config_file
+    
+    # Set environment variable to disable Flash Attention if requested
+    if args.disable_flash_attn:
+        os.environ["DISABLE_FLASH_ATTN"] = "1"
+        print("Flash Attention has been disabled, using standard attention implementation")
     
     # Create tensorboard directory with timestamp
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
