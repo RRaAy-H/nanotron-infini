@@ -1,7 +1,7 @@
 checkpoints:
   checkpoint_interval: 1000
-  # Use NANOTRON_ROOT environment variable or current directory
-  checkpoints_path: "${NANOTRON_ROOT:-$(pwd)}/checkpoints"
+  # Base working directory specified
+  checkpoints_path: "/home/data/daal_insight/fiery/Infini-attention/nanotron-infini/checkpoints"
   checkpoints_path_is_shared_file_system: false
   resume_checkpoint_path: null
   save_initial_state: false
@@ -83,8 +83,8 @@ data_stages:
         dataset_overwrite_cache: false
         dataset_processing_num_proc_per_process: 4  # Increased for faster processing
         hf_dataset_config_name: null
-        # Use NANOTRON_ROOT environment variable or current directory
-        hf_dataset_or_datasets: "${NANOTRON_ROOT:-$(pwd)}/data/processed"
+        # Specific data directory path
+        hf_dataset_or_datasets: "/data1/dataset/HuggingFaceFW/processed"
         hf_dataset_splits: train
         text_column_name: text
       num_loading_workers: 4  # Increased for faster data loading

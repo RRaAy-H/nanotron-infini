@@ -1,7 +1,7 @@
 #!/bin/bash
 # filepath: /Users/zhang/Desktop/huawei/infi_llama/nanotron-infini/train_infini_llama_cpu.sh
 
-cd /Users/zhang/Desktop/huawei/infi_llama/nanotron-infini
+cd /home/data/daal_insight/fiery/Infini-attention/nanotron-infini
 
 echo "Creating a compatible environment..."
 # Create conda environment if it doesn't exist
@@ -17,9 +17,14 @@ echo "Installing dependencies..."
 pip install -e .
 pip install datasets transformers huggingface_hub pyarrow pandas
 
-# Prepare the dataset
-echo "Preparing dataset..."
-python prepare_data.py
+# Check if data directory exists
+if [ ! -d "/data1/dataset/HuggingFaceFW/processed" ]; then
+  echo "Error: Data directory does not exist at /data1/dataset/HuggingFaceFW/processed"
+  echo "Please ensure the data directory exists before continuing"
+  exit 1
+else
+  echo "Using data from: /data1/dataset/HuggingFaceFW/processed"
+fi
 
 echo "Starting training..."
 # Force CPU mode

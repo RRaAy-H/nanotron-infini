@@ -6,8 +6,8 @@
 
 # Default values
 GPU_ID=${1:-0}  # Default to GPU 0 if not specified
-# Set NANOTRON_ROOT to the script's directory for consistent path handling
-export NANOTRON_ROOT=$(cd "$(dirname "$0")" && pwd)
+# Set NANOTRON_ROOT to the specified base directory
+export NANOTRON_ROOT="/home/data/daal_insight/fiery/Infini-attention/nanotron-infini"
 TENSORBOARD_DIR=${2:-"$NANOTRON_ROOT/tensorboard_logs"}  # Default directory for TensorBoard logs
 CONFIG_FILE="custom_infini_config_gpu.yaml"
 
@@ -33,12 +33,13 @@ echo "Checking and installing required dependencies..."
 pip install -e . 2>/dev/null || echo "nanotron already installed"
 pip install torch>=1.13.1 flash-attn>=2.5.0 datasets transformers huggingface_hub pyarrow pandas tensorboard torchvision tqdm
 
-# Check if data is prepared
-if [ ! -d "$NANOTRON_ROOT/data/processed" ]; then
-  echo "Preparing dataset..."
-  python $NANOTRON_ROOT/prepare_data.py
+# Check if data directory exists
+if [ ! -d "/data1/dataset/HuggingFaceFW/processed" ]; then
+  echo "Error: Data directory does not exist at /data1/dataset/HuggingFaceFW/processed"
+  echo "Please ensure the data directory exists before continuing"
+  exit 1
 else
-  echo "Dataset already prepared."
+  echo "Using data from: /data1/dataset/HuggingFaceFW/processed"
 fi
 
 # Start TensorBoard in the background with dynamic port selection
@@ -59,6 +60,19 @@ echo "View TensorBoard at http://localhost:$TB_PORT"
 sleep 3
 
 # Run training with one GPU
+# Verify configuration
+echo "Verifying configuration..."
+python verify_config.py --config-file $CONFIG_FILE
+
+# Confirm everything looks good
+echo -n "Does the configuration look correct? (y/n) "
+read confirmation
+
+if [[ "$confirmation" != "y" && "$confirmation" != "Y" ]]; then
+  echo "Training aborted. Please fix the configuration issues."
+  exit 1
+fi
+
 echo "Starting training..."
 python -u train_gpu_with_tensorboard.py --config-file $CONFIG_FILE --tensorboard-dir $TENSORBOARD_DIR
 
