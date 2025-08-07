@@ -90,6 +90,72 @@ The custom_infini_config.yaml file contains:
 
 3. **flash-attn Issues**: The flash-attention library requires CUDA. If you're on CPU-only, you'll need to modify the code to not use flash-attention.
 
+## GPU Training with TensorBoard
+
+For optimal performance and training visibility, you can use GPU acceleration with TensorBoard monitoring:
+
+### Prerequisites
+
+1. CUDA-compatible GPU (e.g., NVIDIA RTX 4090)
+2. CUDA toolkit installed and configured
+3. Python 3.10 with PyTorch installed
+
+### Setup for GPU Training
+
+1. Install additional dependencies:
+
+```bash
+pip install flash-attn>=2.5.0 tensorboard torchvision tqdm
+```
+
+2. Configure the GPU-specific configuration file:
+
+The `custom_infini_config_gpu.yaml` file is optimized for GPUs with:
+- Full model size parameters
+- Mixed precision (bfloat16) for faster training
+- Flash Attention for efficient attention computation
+- Optimized batch size and learning rate
+
+### Running Training with TensorBoard
+
+1. Make the GPU training script executable:
+
+```bash
+chmod +x train_infini_llama_gpu.sh
+```
+
+2. Start training with GPU and TensorBoard monitoring:
+
+```bash
+# Basic usage (uses GPU 0)
+./train_infini_llama_gpu.sh 0
+
+# Specify a custom TensorBoard log directory
+./train_infini_llama_gpu.sh 0 /path/to/tensorboard_logs
+
+# Use a specific GPU (e.g., GPU 2)
+./train_infini_llama_gpu.sh 2
+```
+
+3. Monitor training progress:
+   - Open your browser to http://localhost:6006
+   - View live metrics including loss, learning rate, and gradient norms
+   - Monitor GPU utilization and memory usage
+
+4. After training completes, you can review logs later:
+
+```bash
+tensorboard --logdir=/path/to/tensorboard_logs
+```
+
+### Understanding TensorBoard Metrics
+
+- **Loss**: The main training objective (should decrease over time)
+- **Learning Rate**: Visualizes the learning rate schedule
+- **Gradients**: Histogram and norm of parameter gradients
+- **Parameters**: Statistics about model parameter values
+- **System**: GPU utilization and memory consumption
+
 ## Alternative Approach
 
 If you continue facing issues with the direct installation, you could:
