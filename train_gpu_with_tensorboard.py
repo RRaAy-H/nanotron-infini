@@ -13,11 +13,23 @@ import argparse
 import sys
 import os
 import time
+import traceback
 from typing import Dict, cast
 from datetime import datetime
 
 # Add the 'src' directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+
+# Check for Flash Attention errors early
+if os.environ.get("DISABLE_FLASH_ATTN", "0") != "1":
+    try:
+        # Try to import Flash Attention to catch issues early
+        import flash_attn
+        print("Flash Attention imported successfully.")
+    except ImportError as e:
+        print(f"Warning: Could not import Flash Attention: {e}")
+        print("Automatically disabling Flash Attention.")
+        os.environ["DISABLE_FLASH_ATTN"] = "1"
 
 # Set default environment variables for distributed training if not already set
 # This enables running without torchrun for single-GPU training
@@ -333,6 +345,22 @@ if __name__ == "__main__":
     if args.disable_flash_attn:
         os.environ["DISABLE_FLASH_ATTN"] = "1"
         print("Flash Attention has been disabled, using standard attention implementation")
+    
+    # Apply Flash Attention patch if it exists
+    patch_script = os.path.join(os.path.dirname(__file__), "patch_flash_attention.py")
+    if os.path.exists(patch_script) and os.access(patch_script, os.X_OK):
+        print("Applying Flash Attention patch to handle potential Flash Attention failures...")
+        try:
+            import subprocess
+            result = subprocess.run([sys.executable, patch_script], 
+                                    capture_output=True, text=True, check=False)
+            if result.returncode == 0:
+                print("Flash Attention patch applied successfully")
+            else:
+                print(f"Warning: Flash Attention patch failed: {result.stderr}")
+        except Exception as e:
+            print(f"Error applying Flash Attention patch: {e}")
+            print("Continuing with training...")
     
     # Create tensorboard directory with timestamp
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
