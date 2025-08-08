@@ -288,7 +288,13 @@ constants.CONFIG = Config()
 print('Infini attention constants configured successfully!')
 "
 
-# Suppress Flash Attention warnings
+# Fix Flash Attention warnings if the fix script exists
+if [[ -f "$PROJECT_ROOT/scripts/fix_flash_attention_warnings.py" ]]; then
+    echo "Attempting to fix Flash Attention warnings..."
+    python "$PROJECT_ROOT/scripts/fix_flash_attention_warnings.py" || true
+fi
+
+# Suppress Flash Attention warnings as a fallback
 export PYTHONWARNINGS="ignore::FutureWarning"
 echo "Suppressed Flash Attention FutureWarnings"
 
