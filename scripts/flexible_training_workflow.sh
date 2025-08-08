@@ -377,6 +377,29 @@ fi
 # Ensure the pre-import script with Adam optimizer patches is used in training
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 
+# Apply the Adam optimizer patch directly before training
+echo "Applying Adam optimizer patch to fix weight_decay=None issue"
+if [[ -f "$PROJECT_ROOT/scripts/apply_adam_patch.sh" ]]; then
+    bash "$PROJECT_ROOT/scripts/apply_adam_patch.sh"
+    echo "Adam patch script executed"
+else
+    echo "Creating temporary Adam patch"
+    python -c "
+import torch.optim.adam
+original_adam = torch.optim.adam.adam
+def patched_adam(*args, **kwargs):
+    if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
+        kwargs['weight_decay'] = 0.0
+    if len(args) >= 4 and args[3] is None:
+        args = list(args)
+        args[3] = 0.0
+        args = tuple(args)
+    return original_adam(*args, **kwargs)
+torch.optim.adam.adam = patched_adam
+print('Applied temporary Adam patch')
+"
+fi
+
 # Use the permanent wrapper script instead of creating a temporary one
 WRAP_SCRIPT="$PROJECT_ROOT/scripts/wrapper_script.py"
 

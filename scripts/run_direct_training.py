@@ -37,12 +37,49 @@ if args.verbose:
     os.environ["NANOTRON_LOG_LEVEL"] = "debug"
     print("Verbose logging enabled")
 
-# Import our Adam optimizer patch to handle weight_decay=None issues
+# Apply multiple methods to fix the Adam optimizer weight_decay=None issue
+adam_patched = False
+
+# Method 1: Try the fix_adam_none_issue module
 try:
-    from nanotron.optim import patch_adam
-    print("Adam optimizer patch applied to handle None weight_decay values")
+    sys.path.insert(0, os.path.join(project_root, "scripts"))
+    from fix_adam_none_issue import patch_adam_optimizer
+    if patch_adam_optimizer():
+        print("Adam optimizer patch applied via fix_adam_none_issue module")
+        adam_patched = True
 except ImportError:
-    print("Warning: Could not import Adam optimizer patch. Weight decay issues may occur.")
+    print("Could not import fix_adam_none_issue module")
+
+# Method 2: Try our project's built-in patch
+if not adam_patched:
+    try:
+        from nanotron.optim import patch_adam
+        print("Adam optimizer patch applied via nanotron.optim.patch_adam")
+        adam_patched = True
+    except ImportError:
+        print("Warning: Could not import nanotron.optim.patch_adam")
+
+# Method 3: Apply direct monkey patch if needed
+if not adam_patched or os.environ.get("FIX_ADAM_WEIGHT_DECAY") == "true":
+    try:
+        import torch.optim.adam
+        original_adam = torch.optim.adam.adam
+        
+        def patched_adam(*args, **kwargs):
+            if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
+                print("Direct patch: Replaced None weight_decay with 0.0")
+                kwargs['weight_decay'] = 0.0
+            if len(args) >= 4 and args[3] is None:
+                args = list(args)
+                args[3] = 0.0
+                args = tuple(args)
+            return original_adam(*args, **kwargs)
+        
+        torch.optim.adam.adam = patched_adam
+        print("Applied direct Adam optimizer patch in training script")
+        adam_patched = True
+    except Exception as e:
+        print(f"Warning: Failed to apply direct Adam optimizer patch: {e}")
 
 # Import after setting environment variables
 from dataclasses import dataclass, field

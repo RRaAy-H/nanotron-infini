@@ -27,13 +27,50 @@ sys.path.insert(0, os.path.join(project_root, 'scripts'))
 
 logger.info(f"Python path set to include: {project_root}")
 
-# Import our patches first - will apply the Adam optimizer patch
-try:
-    import preimport
-    logger.info("Successfully imported pre-import patches")
-except ImportError as e:
-    logger.warning(f"Failed to import pre-import patches: {e}")
-    logger.warning("Weight decay issues may occur during training")
+# Create a simple inline patch for weight_decay=None issue
+logger.info("Applying Adam optimizer patch")
+
+def apply_adam_patch():
+    """
+    Apply a patch to the Adam optimizer to handle None weight_decay values.
+    """
+    try:
+        # Execute the patch code in a separate process to avoid import issues
+        patch_script = os.path.join(project_root, "scripts", "fix_adam_none_issue.py")
+        if os.path.exists(patch_script):
+            logger.info(f"Executing patch script: {patch_script}")
+            # Run the patch script as a separate process
+            import subprocess
+            result = subprocess.run([sys.executable, patch_script], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                logger.info("Patch script executed successfully")
+                logger.info(result.stdout.strip())
+                return True
+            else:
+                logger.warning(f"Patch script failed: {result.stderr.strip()}")
+                return False
+        else:
+            logger.warning(f"Patch script not found: {patch_script}")
+            return False
+    except Exception as e:
+        logger.error(f"Failed to apply patch: {e}")
+        return False
+
+# Try to apply the patch
+patch_result = apply_adam_patch()
+
+# Try alternative approaches if the patch script failed
+if not patch_result:
+    try:
+        # Try to import preimport module
+        import preimport
+        logger.info("Successfully imported preimport module as fallback")
+    except ImportError:
+        logger.warning("Could not import preimport module")
+        # Create a last-resort environment variable to signal patching should be applied
+        os.environ["FIX_ADAM_WEIGHT_DECAY"] = "true"
+        logger.info("Set FIX_ADAM_WEIGHT_DECAY environment variable as fallback approach")
 
 # Now run the actual training script
 if __name__ == "__main__":
