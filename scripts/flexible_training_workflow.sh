@@ -212,8 +212,8 @@ else
     fi
 fi
 
-# Build training command
-TRAIN_CMD="python $PROJECT_ROOT/scripts/run_direct_training.py \
+# Build training command using our wrapper script
+TRAIN_CMD="python \"$WRAP_SCRIPT\" \
     --config-file \"$CONFIG_FILE\" \
     --data-dir \"$PREPROCESSED_DATA\" \
     --gpu-id \"$GPU_ID\" \
@@ -311,9 +311,38 @@ if [[ -f "$PROJECT_ROOT/scripts/fix_flash_attention_warnings.py" ]]; then
     python "$PROJECT_ROOT/scripts/fix_flash_attention_warnings.py" || true
 fi
 
-# We now handle weight decay issues directly in the code and config
-# No need to run the fix_weight_decay.py script which might introduce syntax errors
-echo "Using built-in weight decay handling (0.0 fallback for None values)"
+# Ensure the pre-import script with Adam optimizer patches is used in training
+export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
+
+# Create a wrapper Python script that will import our patches before running the training script
+WRAP_SCRIPT=$(mktemp)
+cat > "$WRAP_SCRIPT" << EOF
+#!/usr/bin/env python
+import sys
+import os
+
+# Import our patches first
+try:
+    sys.path.insert(0, "$PROJECT_ROOT/scripts")
+    import preimport
+    print("Adam optimizer patches applied successfully")
+except ImportError as e:
+    print(f"Warning: Failed to import pre-import patches: {e}")
+
+# Now run the actual training script
+sys.path.insert(0, "$PROJECT_ROOT")
+sys.path.insert(0, "$PROJECT_ROOT/src")
+
+# Get the script path and arguments
+script_path = "$PROJECT_ROOT/scripts/run_direct_training.py"
+script_args = sys.argv[1:]
+
+# Run the script with exec
+os.execvp("python", ["python", script_path] + script_args)
+EOF
+
+chmod +x "$WRAP_SCRIPT"
+echo "Created wrapper script with Adam optimizer patches"
 
 # Suppress Flash Attention warnings as a fallback
 export PYTHONWARNINGS="ignore::FutureWarning"
@@ -346,14 +375,14 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
         mkdir -p "$INFINI_LOG_DIR"
         mkdir -p "$BASELINE_LOG_DIR"
         
-        # Build commands for both models
-        INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python $PROJECT_ROOT/scripts/run_direct_training.py \
+        # Build commands for both models using our wrapper script
+        INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$WRAP_SCRIPT\" \
             --config-file \"$CONFIG_FILE\" \
             --data-dir \"$PREPROCESSED_DATA\" \
             --gpu-id 0 \
             --tensorboard-dir \"$INFINI_TB_DIR\""
         
-        BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python $PROJECT_ROOT/scripts/run_direct_training.py \
+        BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$WRAP_SCRIPT\" \
             --config-file \"$CONFIG_FILE\" \
             --data-dir \"$PREPROCESSED_DATA\" \
             --gpu-id 0 \

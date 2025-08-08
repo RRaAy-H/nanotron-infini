@@ -16,16 +16,28 @@ If `weight_decay` is `None`, then `lr * weight_decay` fails with a `TypeError`.
 
 We implemented multiple fixes to ensure weight decay always has a proper numeric value:
 
-1. **Default Value in `helpers.py`**: Modified the optimizer initialization to ensure weight decay is never None:
+1. **Monkey-Patching PyTorch Adam Optimizer**: Created a comprehensive patch that modifies the PyTorch Adam optimizer at runtime:
 
 ```python
-# Ensure weight_decay is always a valid float value
-wd = 0.0
-if hasattr(optimizer_args, 'weight_decay') and optimizer_args.weight_decay is not None:
-    wd = optimizer_args.weight_decay
+# Store original function
+original_adam = torch.optim.adam.adam
+
+def patched_adam(*args, **kwargs):
+    # Check if weight_decay is None in kwargs and replace with 0.0
+    if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
+        kwargs['weight_decay'] = 0.0
     
-# Then use wd in the optimizer constructor
-weight_decay=wd
+    # Handle positional args for weight_decay (usually 4th arg)
+    if len(args) >= 4 and args[3] is None:
+        args = list(args)
+        args[3] = 0.0
+        args = tuple(args)
+    
+    # Call original function
+    return original_adam(*args, **kwargs)
+
+# Replace the original function with our patched version
+torch.optim.adam.adam = patched_adam
 ```
 
 2. **Config File Validation**: Added code to the `flexible_training_workflow.sh` script to ensure the config file always has a valid `weight_decay` value:

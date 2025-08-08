@@ -37,6 +37,13 @@ if args.verbose:
     os.environ["NANOTRON_LOG_LEVEL"] = "debug"
     print("Verbose logging enabled")
 
+# Import our Adam optimizer patch to handle weight_decay=None issues
+try:
+    from nanotron.optim import patch_adam
+    print("Adam optimizer patch applied to handle None weight_decay values")
+except ImportError:
+    print("Warning: Could not import Adam optimizer patch. Weight decay issues may occur.")
+
 # Import after setting environment variables
 from dataclasses import dataclass, field
 
