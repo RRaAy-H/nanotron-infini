@@ -213,8 +213,6 @@ def preprocess_dataset(
         pipeline_parallel_size=1,
         data_parallel_size=1,
         expert_parallel_size=1,
-        zero_stage=0,
-        tensor_parallel_mode=TensorParallelLinearMode.ALL_REDUCE,
     )
     
     # Create a dummy context for main_rank_first
