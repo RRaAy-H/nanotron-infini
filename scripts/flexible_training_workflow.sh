@@ -379,24 +379,63 @@ export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 
 # Apply the Adam optimizer patch directly before training
 echo "Applying Adam optimizer patch to fix weight_decay=None issue"
-if [[ -f "$PROJECT_ROOT/scripts/apply_adam_patch.sh" ]]; then
+
+# Try our new direct patch approach first (most robust)
+if [[ -f "$PROJECT_ROOT/scripts/direct_adam_patch.py" ]]; then
+    echo "Using direct patching approach (targets PyTorch 2.x _single_tensor_adam function)"
+    PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH" python "$PROJECT_ROOT/scripts/direct_adam_patch.py"
+    PATCH_STATUS=$?
+    
+    if [[ $PATCH_STATUS -eq 0 ]]; then
+        echo "Direct Adam patch applied successfully"
+    else
+        echo "Direct patch failed, trying alternative methods..."
+    fi
+# Try the V2 patch script if available
+elif [[ -f "$PROJECT_ROOT/scripts/apply_adam_patch_v2.sh" ]]; then
+    bash "$PROJECT_ROOT/scripts/apply_adam_patch_v2.sh"
+    echo "Adam patch script executed via V2 script"
+# Try the original patch script
+elif [[ -f "$PROJECT_ROOT/scripts/apply_adam_patch.sh" ]]; then
     bash "$PROJECT_ROOT/scripts/apply_adam_patch.sh"
     echo "Adam patch script executed"
+# Create and run a simple inline patch as a last resort
 else
-    echo "Creating temporary Adam patch"
+    echo "Creating a minimal Adam patch that should work with all PyTorch versions"
     python -c "
-import torch.optim.adam
-original_adam = torch.optim.adam.adam
-def patched_adam(*args, **kwargs):
-    if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
-        kwargs['weight_decay'] = 0.0
-    if len(args) >= 4 and args[3] is None:
-        args = list(args)
-        args[3] = 0.0
-        args = tuple(args)
-    return original_adam(*args, **kwargs)
-torch.optim.adam.adam = patched_adam
-print('Applied temporary Adam patch')
+import torch
+from torch.optim import Adam
+
+# Store original step method
+original_step = Adam.step
+
+# Create patched step method
+def patched_step(self, closure=None):
+    # Replace None weight_decay with 0.0 in optimizer instance
+    for group in self.param_groups:
+        if 'weight_decay' in group and group['weight_decay'] is None:
+            print('Fixed: Replaced None weight_decay with 0.0')
+            group['weight_decay'] = 0.0
+    return original_step(self, closure)
+
+# Apply the patch
+Adam.step = patched_step
+print('Applied direct Adam class patch')
+
+# Try to patch _single_tensor_adam if it exists in this PyTorch version
+try:
+    from torch.optim import adam
+    if hasattr(adam, '_single_tensor_adam'):
+        original_func = adam._single_tensor_adam
+        def patched_single_tensor_adam(*args, **kwargs):
+            if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
+                print('Fixed: Replaced None weight_decay with 0.0 in _single_tensor_adam')
+                kwargs['weight_decay'] = 0.0
+            return original_func(*args, **kwargs)
+        adam._single_tensor_adam = patched_single_tensor_adam
+        print('Also patched _single_tensor_adam function')
+except Exception:
+    pass
 "
 fi
 

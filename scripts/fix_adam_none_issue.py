@@ -22,52 +22,61 @@ logger = logging.getLogger(__name__)
 def patch_adam_optimizer():
     """
     Patch the PyTorch Adam optimizer to handle None weight_decay values.
+    Works with different PyTorch versions by patching the optimizer class directly.
     """
     try:
         import torch
+        from torch.optim import Adam
         
-        if not hasattr(torch.optim, 'adam'):
-            logger.warning("torch.optim.adam module not found, cannot apply patch")
-            return False
-            
-        # Store original function
-        original_adam = torch.optim.adam.adam
+        # Store original step method
+        original_step = Adam.step
         
-        def patched_adam(*args, **kwargs):
+        # Create patched step method
+        def patched_step(self, closure=None):
             """
-            A wrapper around the PyTorch Adam implementation that ensures weight_decay is never None.
+            Patched step method that ensures weight_decay is never None
             """
-            # Check if weight_decay is None in kwargs and replace with 0.0
-            if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
-                logger.info("Replaced None weight_decay with 0.0 in Adam optimizer")
-                kwargs['weight_decay'] = 0.0
-            
-            # Handle positional args for weight_decay (usually the 4th argument)
-            if len(args) >= 4 and args[3] is None:
-                logger.info("Replaced None weight_decay in positional args with 0.0")
-                args = list(args)
-                args[3] = 0.0
-                args = tuple(args)
-            
-            # Call the original adam function
-            return original_adam(*args, **kwargs)
+            # Replace None weight_decay with 0.0 in optimizer instance
+            for group in self.param_groups:
+                if 'weight_decay' in group and group['weight_decay'] is None:
+                    logger.info("Replaced None weight_decay with 0.0 in Adam optimizer group")
+                    group['weight_decay'] = 0.0
+                    
+            # Call original step method
+            return original_step(self, closure)
         
-        # Replace the original function with our patched version
-        torch.optim.adam.adam = patched_adam
+        # Apply the patch
+        Adam.step = patched_step
         
-        # Also patch specific implementations if they exist
-        if hasattr(torch.optim.adam, '_single_tensor_adam'):
-            original_single = torch.optim.adam._single_tensor_adam
-            
-            def patched_single_tensor_adam(*args, **kwargs):
-                if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
-                    kwargs['weight_decay'] = 0.0
-                return original_single(*args, **kwargs)
-            
-            torch.optim.adam._single_tensor_adam = patched_single_tensor_adam
+        # Also patch the constructor to ensure weight_decay is never None
+        original_init = Adam.__init__
         
+        def patched_init(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8, 
+                        weight_decay=0, amsgrad=False, **kwargs):
+            # Replace None weight_decay with 0.0
+            if weight_decay is None:
+                logger.info("Replaced None weight_decay with 0.0 in Adam constructor")
+                weight_decay = 0.0
+                
+            # Call original init with fixed weight_decay
+            original_init(self, params, lr=lr, betas=betas, eps=eps, 
+                         weight_decay=weight_decay, amsgrad=amsgrad, **kwargs)
+        
+        # Apply init patch if possible (handle different PyTorch versions)
+        try:
+            Adam.__init__ = patched_init
+        except Exception as e:
+            logger.warning(f"Could not patch Adam.__init__: {e}")
+            
         logger.info("Successfully patched PyTorch Adam optimizer")
         return True
+        
+    except ImportError:
+        logger.error("Failed to import torch - is PyTorch installed?")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to patch PyTorch Adam optimizer: {e}")
+        return False
     except ImportError:
         logger.error("Failed to import torch - is PyTorch installed?")
         return False

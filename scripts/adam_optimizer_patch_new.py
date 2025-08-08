@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# filepath: /Users/zhang/Desktop/huawei/infi_llama/nanotron-infini/scripts/adam_optimizer_patch.py
 """
 Direct Adam optimizer patch that can be imported into any script.
 This module will patch the PyTorch Adam optimizer to handle None weight_decay values.
@@ -11,6 +13,11 @@ To verify:
 
 import os
 import sys
+import logging
+
+# Configure simple logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 def apply_patch():
     """Apply the patch to the Adam optimizer class directly"""
@@ -62,27 +69,28 @@ def apply_patch():
     except Exception as e:
         print(f"[ERROR] Failed to apply Adam optimizer patch: {e}")
         return False
-    
-    print("[PATCH] Adam optimizer successfully patched to handle None weight_decay")
-    return True
 
 def test_patch():
     """Test that the patch works by creating an optimizer with weight_decay=None"""
-    import torch
-    
-    # Create a simple model and optimizer
-    model = torch.nn.Linear(10, 1)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=None)
-    
-    # Try using it
-    x = torch.randn(1, 10)
-    y_pred = model(x)
-    loss = (y_pred - torch.randn(1, 1)).pow(2).mean()
-    loss.backward()
-    optimizer.step()
-    
-    print("[TEST] Successfully used Adam optimizer with weight_decay=None")
-    return True
+    try:
+        import torch
+        
+        # Create a simple model and optimizer
+        model = torch.nn.Linear(10, 1)
+        optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=None)
+        
+        # Try using it
+        x = torch.randn(1, 10)
+        y_pred = model(x)
+        loss = (y_pred - torch.randn(1, 1)).pow(2).mean()
+        loss.backward()
+        optimizer.step()
+        
+        print("[TEST] Successfully used Adam optimizer with weight_decay=None")
+        return True
+    except Exception as e:
+        print(f"[ERROR] Failed to test Adam optimizer patch: {e}")
+        return False
 
 # Apply patch immediately when imported
 try:

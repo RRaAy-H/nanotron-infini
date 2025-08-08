@@ -192,17 +192,41 @@ RuntimeError: __main__ module not found in script
 
 If you still see the weight decay error despite applying the patches:
 
-1. **Check if the patch is actually being applied**:
+1. **For PyTorch 2.x specific error in _single_tensor_adam**:
+   ```
+   File "/path/to/site-packages/torch/optim/adam.py", line 411, in _single_tensor_adam
+   param.mul_(1 - lr * weight_decay)
+   TypeError: unsupported operand type(s) for *: 'float' and 'NoneType'
+   ```
+   
+   This specific error requires patching the `_single_tensor_adam` function directly:
    ```bash
-   # Add this temporarily to your script
-   python -c "import torch.optim.adam; print('Current Adam implementation:', torch.optim.adam.adam)"
+   # Use our direct patch script that specifically targets this function
+   python scripts/direct_adam_patch.py
    ```
 
-2. **Verify that multiple Python processes aren't conflicting**:
+2. **Check if the patch is actually being applied**:
+   ```bash
+   # Add this temporarily to your script
+   python -c "
+   import torch
+   from torch.optim import Adam
+   print('Current Adam step implementation:', Adam.step)
+   
+   # Also check for _single_tensor_adam in PyTorch 2.x
+   try:
+       from torch.optim import adam
+       print('Has _single_tensor_adam:', hasattr(adam, '_single_tensor_adam'))
+   except:
+       pass
+   "
+   ```
+
+3. **Verify that multiple Python processes aren't conflicting**:
    - Sometimes distributed training can launch separate processes that don't inherit the patch
    - Apply the patch in the entry point of each process
 
-3. **Check for any custom optimizer implementations**:
+4. **Check for any custom optimizer implementations**:
    - Custom optimizers might need their own patches
 
 #### Python Path Issues

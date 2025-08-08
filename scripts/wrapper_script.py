@@ -33,9 +33,20 @@ logger.info("Applying Adam optimizer patch")
 def apply_adam_patch():
     """
     Apply a patch to the Adam optimizer to handle None weight_decay values.
+    Tries multiple methods to ensure the patch is applied successfully.
     """
     try:
-        # Execute the patch code in a separate process to avoid import issues
+        # Method 1: Try to import our proper module first (most robust solution)
+        try:
+            from nanotron.optim.fix_weight_decay import patch_adam_optimizer
+            success = patch_adam_optimizer()
+            if success:
+                logger.info("Adam optimizer patch applied via nanotron.optim.fix_weight_decay")
+                return True
+        except ImportError:
+            logger.warning("Could not import nanotron.optim.fix_weight_decay, trying alternative methods")
+        
+        # Method 2: Execute the patch script in a separate process
         patch_script = os.path.join(project_root, "scripts", "fix_adam_none_issue.py")
         if os.path.exists(patch_script):
             logger.info(f"Executing patch script: {patch_script}")
@@ -49,10 +60,34 @@ def apply_adam_patch():
                 return True
             else:
                 logger.warning(f"Patch script failed: {result.stderr.strip()}")
-                return False
-        else:
-            logger.warning(f"Patch script not found: {patch_script}")
-            return False
+                
+        # Method 3: Direct patching of the Adam class
+        try:
+            import torch
+            from torch.optim import Adam
+            
+            # Store original step method
+            original_step = Adam.step
+            
+            def patched_step(self, closure=None):
+                # Replace None weight_decay with 0.0 in optimizer instance
+                for group in self.param_groups:
+                    if 'weight_decay' in group and group['weight_decay'] is None:
+                        logger.info("Fixed: Replaced None weight_decay with 0.0 in Adam group")
+                        group['weight_decay'] = 0.0
+                        
+                # Call original step method
+                return original_step(self, closure)
+            
+            # Apply the patch
+            Adam.step = patched_step
+            logger.info("Directly patched Adam.step method")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to directly patch Adam class: {e}")
+            
+        # If we got here, all methods failed
+        return False
     except Exception as e:
         logger.error(f"Failed to apply patch: {e}")
         return False

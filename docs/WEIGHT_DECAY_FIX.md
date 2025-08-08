@@ -24,10 +24,16 @@ The issue happens because:
 
 3. In the optimization loop, it attempts to perform the `param.mul(1 - lr * weight_decay)` operation, which fails when weight_decay is None.
 
-4. This can happen when:
+4. In PyTorch 2.x versions, this happens in the `_single_tensor_adam` function, specifically at the line:
+   ```python
+   param.mul_(1 - lr * weight_decay)  # Fails when weight_decay is None
+   ```
+
+5. This can happen when:
    - Config files explicitly set weight_decay to null/None
    - No weight_decay is specified and the optimizer uses None as default
    - Parameter settings are improperly passed between modules
+   - Using PyTorch 2.x with older patching approaches that don't target the `_single_tensor_adam` function
 
 ## Solution
 
