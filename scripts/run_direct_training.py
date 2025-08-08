@@ -107,9 +107,7 @@ def main():
     from nanotron.dataloader import DataCollatorForCLM
     
     # Initialize data collator without problematic parameters
-    data_collator = DataCollatorForCLM()
-    
-    # Use PyTorch's DataLoader directly instead of get_train_dataloader
+    data_collator = DataCollatorForCLM(
         expert_parallel_size=1,
     )
     
