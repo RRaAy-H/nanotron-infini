@@ -213,7 +213,7 @@ else
 fi
 
 # Build training command using our wrapper script
-TRAIN_CMD="python \"$WRAP_SCRIPT\" \
+TRAIN_CMD="python $WRAP_SCRIPT \
     --config-file \"$CONFIG_FILE\" \
     --data-dir \"$PREPROCESSED_DATA\" \
     --gpu-id \"$GPU_ID\" \
@@ -360,13 +360,13 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
         mkdir -p "$BASELINE_LOG_DIR"
         
         # Build commands for both models using our wrapper script
-        INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$WRAP_SCRIPT\" \
+        INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python $WRAP_SCRIPT \
             --config-file \"$CONFIG_FILE\" \
             --data-dir \"$PREPROCESSED_DATA\" \
             --gpu-id 0 \
             --tensorboard-dir \"$INFINI_TB_DIR\""
         
-        BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$WRAP_SCRIPT\" \
+        BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python $WRAP_SCRIPT \
             --config-file \"$CONFIG_FILE\" \
             --data-dir \"$PREPROCESSED_DATA\" \
             --gpu-id 0 \

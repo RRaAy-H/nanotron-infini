@@ -88,7 +88,10 @@ If you encounter issues with the wrapper script, you can test it using:
 ```
 
 Common issues:
-- **`__main__ module` error**: This can happen if the wrapper script is created as a temporary file without a proper path. Use the permanent `wrapper_script.py` instead.
+- **`__main__ module` error**: This can happen if:
+  - The wrapper script is created as a temporary file without a proper path
+  - The wrapper script path is passed with extra quotes in the command
+  - Solution: Use the permanent `wrapper_script.py` and ensure it's referenced correctly in commands (without extra quotes)
 - **Import errors**: Ensure that the Python path includes the project root and script directories.
 - **Permission denied**: Make sure the wrapper script has execute permissions with `chmod +x scripts/wrapper_script.py`.
 
