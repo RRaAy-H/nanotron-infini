@@ -252,13 +252,29 @@ mkdir -p "$TRAINING_LOGS_DIR"
 chmod -R 755 "$TRAINING_LOGS_DIR"
 echo "Training logs will be saved to: $TRAINING_LOGS_DIR"
 
-# Temporarily modify the config if needed to disable fused Adam
+# Temporarily modify the config if needed to disable fused Adam and ensure weight_decay is set
+CONFIG_TEMP="${CONFIG_FILE%.yaml}_temp.yaml"
+
 if [[ "$DISABLE_FUSED_ADAM" = true ]]; then
-    CONFIG_TEMP="${CONFIG_FILE%.yaml}_temp.yaml"
     cat "$CONFIG_FILE" | sed 's/torch_adam_is_fused: true/torch_adam_is_fused: false/g' > "$CONFIG_TEMP"
-    CONFIG_FILE="$CONFIG_TEMP"
     echo "Created temporary config with fused Adam disabled to avoid optimizer errors"
+else
+    # Just copy the file without changes to continue the process
+    cp "$CONFIG_FILE" "$CONFIG_TEMP"
 fi
+
+# Check if weight_decay is missing or None in the config and add it
+if ! grep -q "weight_decay:" "$CONFIG_TEMP" || grep -q "weight_decay: *null" "$CONFIG_TEMP"; then
+    # Add or replace weight_decay with default value 0.01
+    sed -i.bak '/optimizer:/,/zero_stage:/ s/\(weight_decay: *\)null/\10.01/' "$CONFIG_TEMP"
+    if ! grep -q "weight_decay:" "$CONFIG_TEMP"; then
+        # If weight_decay is completely missing, add it before zero_stage
+        sed -i.bak '/optimizer:/,/zero_stage:/ s/\(zero_stage:.*\)/weight_decay: 0.01\n  \1/' "$CONFIG_TEMP"
+    fi
+    echo "Added default weight_decay: 0.01 to config to avoid NoneType errors in optimizer"
+fi
+
+CONFIG_FILE="$CONFIG_TEMP"
 
 # Configure Infini-Attention constants
 python -c "
@@ -292,6 +308,13 @@ print('Infini attention constants configured successfully!')
 if [[ -f "$PROJECT_ROOT/scripts/fix_flash_attention_warnings.py" ]]; then
     echo "Attempting to fix Flash Attention warnings..."
     python "$PROJECT_ROOT/scripts/fix_flash_attention_warnings.py" || true
+fi
+
+# Fix weight decay NoneType errors
+if [[ -f "$PROJECT_ROOT/scripts/fix_weight_decay.py" ]]; then
+    echo "Fixing potential weight decay NoneType errors..."
+    python "$PROJECT_ROOT/scripts/fix_weight_decay.py" || true
+    echo "Weight decay fixes applied"
 fi
 
 # Suppress Flash Attention warnings as a fallback
