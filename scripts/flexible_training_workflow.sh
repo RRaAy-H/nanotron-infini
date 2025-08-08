@@ -116,6 +116,58 @@ done
 # Set Python path to include project root and src directory
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 
+# Define the wrapper script path early so we can do checks
+WRAP_SCRIPT="$PROJECT_ROOT/scripts/wrapper_script.py"
+
+# Check if the wrapper script exists
+if [[ ! -f "$WRAP_SCRIPT" ]]; then
+    echo "Warning: Wrapper script not found at $WRAP_SCRIPT"
+    echo "Checking for script creation..."
+    
+    # Check if we can create the wrapper script
+    if [[ -d "$PROJECT_ROOT/scripts" ]]; then
+        echo "Creating wrapper script at: $WRAP_SCRIPT"
+        # Create a simple wrapper script that imports patches and runs the training script
+        cat > "$WRAP_SCRIPT" << EOF
+#!/usr/bin/env python
+# filepath: $WRAP_SCRIPT
+import os
+import sys
+
+# Add project paths
+project_root = "$PROJECT_ROOT"
+sys.path.insert(0, project_root)
+sys.path.insert(0, os.path.join(project_root, "src"))
+sys.path.insert(0, os.path.join(project_root, "scripts"))
+
+# Try to import patches
+try:
+    import preimport
+    print("Adam optimizer patches applied successfully")
+except ImportError as e:
+    print(f"Warning: Failed to import pre-import patches: {e}")
+
+# Run the training script
+script_path = os.path.join(project_root, "scripts", "run_direct_training.py")
+if not os.path.exists(script_path):
+    print(f"Error: Training script not found at: {script_path}")
+    sys.exit(1)
+
+# Execute the training script with arguments
+os.execvp("python", ["python", script_path] + sys.argv[1:])
+EOF
+        # Make it executable
+        chmod +x "$WRAP_SCRIPT"
+        echo "Wrapper script created successfully"
+    else
+        echo "Cannot create wrapper script: scripts directory not found"
+        echo "Will fall back to direct execution"
+    fi
+else
+    echo "Found wrapper script at: $WRAP_SCRIPT"
+    chmod +x "$WRAP_SCRIPT"  # Ensure it's executable
+fi
+
 # Check if we have either raw data or preprocessed data
 if [[ -z "$RAW_DATA" ]] && [[ -z "$PREPROCESSED_DATA" ]]; then
     echo "Error: Either --raw-data or --preprocessed-data must be specified."
@@ -213,11 +265,22 @@ else
 fi
 
 # Build training command using our wrapper script
-TRAIN_CMD="python $WRAP_SCRIPT \
-    --config-file \"$CONFIG_FILE\" \
-    --data-dir \"$PREPROCESSED_DATA\" \
-    --gpu-id \"$GPU_ID\" \
-    --tensorboard-dir \"$TENSORBOARD_DIR\""
+# Make sure to provide the full path to the wrapper script
+if [[ -f "$WRAP_SCRIPT" ]]; then
+    TRAIN_CMD="python \"$WRAP_SCRIPT\" \
+        --config-file \"$CONFIG_FILE\" \
+        --data-dir \"$PREPROCESSED_DATA\" \
+        --gpu-id \"$GPU_ID\" \
+        --tensorboard-dir \"$TENSORBOARD_DIR\""
+else
+    # Fallback to direct execution if wrapper script doesn't exist
+    echo "WARNING: Wrapper script not found, falling back to direct execution"
+    TRAIN_CMD="python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+        --config-file \"$CONFIG_FILE\" \
+        --data-dir \"$PREPROCESSED_DATA\" \
+        --gpu-id \"$GPU_ID\" \
+        --tensorboard-dir \"$TENSORBOARD_DIR\""
+fi
 
 # Add optional flags
 if [[ "$DISABLE_INFINI_ATTN" = true ]]; then
@@ -328,6 +391,14 @@ fi
 chmod +x "$WRAP_SCRIPT"
 echo "Using wrapper script with Adam optimizer patches: $WRAP_SCRIPT"
 
+# Debug output to verify the wrapper script exists
+echo "Wrapper script path: $WRAP_SCRIPT"
+if [[ -f "$WRAP_SCRIPT" ]]; then
+    echo "Confirmed wrapper script exists"
+else
+    echo "WARNING: Wrapper script not found at this path, training will fail!"
+fi
+
 # Suppress Flash Attention warnings as a fallback
 export PYTHONWARNINGS="ignore::FutureWarning"
 echo "Suppressed Flash Attention FutureWarnings"
@@ -360,18 +431,35 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
         mkdir -p "$BASELINE_LOG_DIR"
         
         # Build commands for both models using our wrapper script
-        INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python $WRAP_SCRIPT \
-            --config-file \"$CONFIG_FILE\" \
-            --data-dir \"$PREPROCESSED_DATA\" \
-            --gpu-id 0 \
-            --tensorboard-dir \"$INFINI_TB_DIR\""
-        
-        BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python $WRAP_SCRIPT \
-            --config-file \"$CONFIG_FILE\" \
-            --data-dir \"$PREPROCESSED_DATA\" \
-            --gpu-id 0 \
-            --disable-infini-attn \
-            --tensorboard-dir \"$BASELINE_TB_DIR\""
+        if [[ -f "$WRAP_SCRIPT" ]]; then
+            INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$WRAP_SCRIPT\" \
+                --config-file \"$CONFIG_FILE\" \
+                --data-dir \"$PREPROCESSED_DATA\" \
+                --gpu-id 0 \
+                --tensorboard-dir \"$INFINI_TB_DIR\""
+            
+            BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$WRAP_SCRIPT\" \
+                --config-file \"$CONFIG_FILE\" \
+                --data-dir \"$PREPROCESSED_DATA\" \
+                --gpu-id 0 \
+                --disable-infini-attn \
+                --tensorboard-dir \"$BASELINE_TB_DIR\""
+        else
+            # Fallback to direct execution if wrapper script doesn't exist
+            echo "WARNING: Wrapper script not found, falling back to direct execution for parallel training"
+            INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                --config-file \"$CONFIG_FILE\" \
+                --data-dir \"$PREPROCESSED_DATA\" \
+                --gpu-id 0 \
+                --tensorboard-dir \"$INFINI_TB_DIR\""
+            
+            BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                --config-file \"$CONFIG_FILE\" \
+                --data-dir \"$PREPROCESSED_DATA\" \
+                --gpu-id 0 \
+                --disable-infini-attn \
+                --tensorboard-dir \"$BASELINE_TB_DIR\""
+        fi
         
         # Add optional flags to both commands
         if [[ "$USE_GPU_DATALOADER" = true ]]; then
@@ -421,6 +509,13 @@ fi
 if [[ "$RUN_BOTH_MODELS" != true ]]; then
     echo "Starting training with command:"
     echo "$TRAIN_CMD"
+    
+    # Debug output to verify command construction
+    echo "Debug - Checking command components:"
+    echo "  Wrapper script: $WRAP_SCRIPT"
+    echo "  Config file: $CONFIG_FILE"
+    echo "  Data directory: $PREPROCESSED_DATA"
+    
     echo "-------------------------------------"
     eval $TRAIN_CMD
     
