@@ -33,10 +33,11 @@ echo "======================================================================"
 
 echo "Using tiny dataset at: $DATA_SOURCE"
 
-"${SCRIPT_DIR}/run_infini_llama.sh" \
-  --config "$TEST_CONFIG" \
+# Run preprocessing directly with our fixed script
+python "${SCRIPT_DIR}/preprocessing/preprocess_data_fixed.py" \
+  --config-file "$TEST_CONFIG" \
   --output-dir "$OUTPUT_DIR" \
-  --preprocess-only
+  --gpu-id 0
 
 # Check if preprocessing was successful
 if [ $? -ne 0 ]; then

@@ -20,9 +20,9 @@ echo "Configuration: ${CONFIG_FILE}"
 echo "Output dir: ${OUTPUT_DIR}"
 echo ""
 
-# Run the preprocessing script directly
-echo "Executing preprocessing script..."
-python "${SCRIPT_DIR}/preprocessing/preprocess_data.py" \
+# Run the fixed preprocessing script instead
+echo "Executing fixed preprocessing script..."
+python "${SCRIPT_DIR}/preprocessing/preprocess_data_fixed.py" \
   --config-file "$CONFIG_FILE" \
   --output-dir "$OUTPUT_DIR" \
   --gpu-id 0
