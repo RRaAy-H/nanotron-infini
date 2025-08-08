@@ -11,11 +11,15 @@ Features:
 - TensorBoard integration for monitoring training
 - Support for both CPU and GPU training
 - Proper distributed environment setup
+- Support for both Infini-Attention and baseline model training
 
 Usage:
 ```
-# For GPU training with Flash Attention:
+# For GPU training with Infini-Attention (default):
 python train_infini_llama.py --config-file custom_infini_config_gpu.yaml
+
+# For GPU training with baseline model (without Infini-Attention):
+python train_infini_llama.py --config-file custom_infini_config_gpu.yaml --disable-infini-attn
 
 # For GPU training without Flash Attention:
 python train_infini_llama.py --config-file custom_infini_config_gpu.yaml --disable-flash-attn
@@ -528,6 +532,8 @@ def get_args():
                        help="Directory for TensorBoard logs. If not provided, TensorBoard logging is disabled.")
     parser.add_argument("--disable-flash-attn", action="store_true", 
                        help="Disable Flash Attention and use standard attention")
+    parser.add_argument("--disable-infini-attn", action="store_true", 
+                       help="Disable Infini-Attention and run with standard attention only (baseline)")
     parser.add_argument("--cpu-only", action="store_true", 
                        help="Force CPU-only training even if GPUs are available")
     parser.add_argument("--gpu-device", type=str, default="cuda:0",
@@ -566,6 +572,11 @@ def setup_environment(args):
         if flash_available:
             apply_flash_attention_patch()
     
+    # Disable Infini-Attention if requested (for baseline training)
+    if args.disable_infini_attn:
+        constants.CONFIG.infini_attention.turn_on_memory = False
+        print("Infini-Attention has been disabled, running with standard attention only (baseline model)")
+    
     # Initialize distributed environment
     init_distributed_environment()
     
@@ -577,6 +588,10 @@ def setup_environment(args):
     print(f"  Balance act type: {constants.CONFIG.infini_attention.balance_act_type}")
     print(f"  Balance factor LR: {constants.CONFIG.infini_attention.balance_factor_lr}")
     print(f"  Flash Attention enabled: {os.environ.get('DISABLE_FLASH_ATTN', '0') == '0'}")
+    
+    # Print model type based on Infini-Attention setting
+    model_type = "Baseline Llama" if not constants.CONFIG.infini_attention.turn_on_memory else "Infini-Llama"
+    print(f"  Model type: {model_type}")
     
     if args.use_gpu_dataloader:
         print(f"  GPU-accelerated data processing: Enabled (device: {args.gpu_device})")
