@@ -306,10 +306,13 @@ class OneForwardOneBackwardPipelineEngine(PipelineEngine):
 
                         sample_index = random.randint(0, len(decoded_texts) - 1)
 
-                        with open(
-                            f"/fsx/phuc/projects/nanotron/examples/infinite-context-length/training_logs/{run_name}_data_logs.txt",
-                            "a",
-                        ) as file:
+                        # Create logs directory in the current project
+                        import os
+                        log_dir = os.environ.get("TRAINING_LOGS_DIR", "training_logs")
+                        os.makedirs(log_dir, exist_ok=True)
+                        log_path = os.path.join(log_dir, f"{run_name}_data_logs.txt")
+                        
+                        with open(log_path, "a") as file:
                             # Write the self.idx number and the decoded text to the file
                             file.write(f"iteration_step: {constants.GLOBAL_STEP}\n")
 

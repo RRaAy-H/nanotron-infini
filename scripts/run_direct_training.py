@@ -153,6 +153,7 @@ def main():
     print(f"Batch size: {trainer.config.tokens.micro_batch_size}")
     print(f"Sequence length: {trainer.config.tokens.sequence_length}")
     print(f"TensorBoard logging: {'Enabled' if args.tensorboard_dir else 'Disabled'}")
+    print(f"Training logs directory: {os.environ.get('TRAINING_LOGS_DIR', 'training_logs')}")
     
     try:
         print("Calling trainer.train() with the dataloader...")

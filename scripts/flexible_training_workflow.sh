@@ -230,6 +230,13 @@ export CUDA_VISIBLE_DEVICES=$GPU_ID
 # Set up environment variables for proper path resolution
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 
+# Set up training logs directory
+export TRAINING_LOGS_DIR="$PROJECT_ROOT/training_logs"
+mkdir -p "$TRAINING_LOGS_DIR"
+# Ensure write permissions
+chmod -R 755 "$TRAINING_LOGS_DIR"
+echo "Training logs will be saved to: $TRAINING_LOGS_DIR"
+
 # Configure Infini-Attention constants
 python -c "
 from dataclasses import dataclass, field
@@ -279,14 +286,20 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
         mkdir -p "$INFINI_TB_DIR"
         mkdir -p "$BASELINE_TB_DIR"
         
+        # Create separate log directories
+        INFINI_LOG_DIR="$TRAINING_LOGS_DIR/infini_$(date +"%Y%m%d_%H%M%S")"
+        BASELINE_LOG_DIR="$TRAINING_LOGS_DIR/baseline_$(date +"%Y%m%d_%H%M%S")"
+        mkdir -p "$INFINI_LOG_DIR"
+        mkdir -p "$BASELINE_LOG_DIR"
+        
         # Build commands for both models
-        INFINI_CMD="CUDA_VISIBLE_DEVICES=0 python $PROJECT_ROOT/scripts/run_direct_training.py \
+        INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python $PROJECT_ROOT/scripts/run_direct_training.py \
             --config-file \"$CONFIG_FILE\" \
             --data-dir \"$PREPROCESSED_DATA\" \
             --gpu-id 0 \
             --tensorboard-dir \"$INFINI_TB_DIR\""
         
-        BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 python $PROJECT_ROOT/scripts/run_direct_training.py \
+        BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python $PROJECT_ROOT/scripts/run_direct_training.py \
             --config-file \"$CONFIG_FILE\" \
             --data-dir \"$PREPROCESSED_DATA\" \
             --gpu-id 0 \
@@ -327,8 +340,10 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
         echo "Parallel training completed!"
         echo "Infini-Attention model status: $INFINI_STATUS (0 = success)"
         echo "Baseline model status: $BASELINE_STATUS (0 = success)"
-        echo "Infini-Attention logs saved to: $INFINI_TB_DIR"
-        echo "Baseline logs saved to: $BASELINE_TB_DIR"
+        echo "Infini-Attention TensorBoard logs: $INFINI_TB_DIR"
+        echo "Baseline TensorBoard logs: $BASELINE_TB_DIR"
+        echo "Infini-Attention training logs: $INFINI_LOG_DIR"
+        echo "Baseline training logs: $BASELINE_LOG_DIR"
         echo "Log files: infini_training.log and baseline_training.log"
         echo "To compare training progress: tensorboard --logdir_spec=infini:$INFINI_TB_DIR,baseline:$BASELINE_TB_DIR"
         echo "-------------------------------------"
