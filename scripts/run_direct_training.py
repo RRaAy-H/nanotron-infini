@@ -10,6 +10,7 @@ import os
 import sys
 import argparse
 import torch
+from torch.utils.data import DataLoader
 from pathlib import Path
 
 # Add project root and src directories to path
@@ -37,6 +38,9 @@ if args.verbose:
     print("Verbose logging enabled")
 
 # Import after setting environment variables
+import torch
+from torch.utils.data import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 from dataclasses import dataclass, field
 
 @dataclass
@@ -100,29 +104,21 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
     # Set up data collator
-    from nanotron.dataloader import DataCollatorForCLM, get_train_dataloader
-    from nanotron.parallel import ParallelContext
-
-    # Create a simple parallel context for single GPU training
-    parallel_context = ParallelContext(
-        tensor_parallel_size=1,
-        pipeline_parallel_size=1,
-        data_parallel_size=1,
-        expert_parallel_size=1
+    from nanotron.dataloader import DataCollatorForCLM
+    
+    # Initialize data collator without problematic parameters
+    data_collator = DataCollatorForCLM()
+    
+    # Use PyTorch's DataLoader directly instead of get_train_dataloader
+        expert_parallel_size=1,
     )
     
-    # Initialize data collator with proper parameters
-    data_collator = DataCollatorForCLM(
-        sequence_length=trainer.config.tokens.sequence_length,
-        input_pp_rank=0,
-        output_pp_rank=0,
-        parallel_context=parallel_context
-    )
-    
-    # Create dataloader
-    train_loader = get_train_dataloader(
-        train_dataset=train_dataset,
+    # Use a custom DataLoader instead of get_train_dataloader which has different parameters
+    from torch.utils.data import DataLoader
+    train_loader = DataLoader(
+        dataset=train_dataset,
         batch_size=trainer.config.tokens.micro_batch_size,
+        shuffle=True,
         collate_fn=data_collator,
     )
     
