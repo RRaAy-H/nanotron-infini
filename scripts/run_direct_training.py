@@ -40,8 +40,13 @@ if args.verbose:
 # Import after setting environment variables
 import torch
 from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
 from dataclasses import dataclass, field
+
+# Import SummaryWriter conditionally to avoid errors if not available
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except ImportError:
+    SummaryWriter = None
 
 @dataclass
 class InfiniAttentionConfig:
@@ -105,10 +110,17 @@ def main():
 
     # Set up data collator
     from nanotron.dataloader import DataCollatorForCLM
+    from nanotron.parallel.pipeline_parallel.utils import get_input_output_pp_ranks
     
-    # Initialize data collator without problematic parameters
+    # Get the correct input and output pipeline parallel ranks
+    input_pp_rank, output_pp_rank = get_input_output_pp_ranks(trainer.parallel_context.pipeline_parallel_size)
+    
+    # Initialize data collator with proper parameters
     data_collator = DataCollatorForCLM(
-        expert_parallel_size=1,
+        sequence_length=trainer.config.tokens.sequence_length,
+        input_pp_rank=input_pp_rank,
+        output_pp_rank=output_pp_rank,
+        parallel_context=trainer.parallel_context,
     )
     
     # Use a custom DataLoader instead of get_train_dataloader which has different parameters
@@ -123,11 +135,10 @@ def main():
     # Set up TensorBoard if requested
     if args.tensorboard_dir:
         os.makedirs(args.tensorboard_dir, exist_ok=True)
-        try:
-            from torch.utils.tensorboard import SummaryWriter
+        if SummaryWriter is not None:
             tb_writer = SummaryWriter(log_dir=args.tensorboard_dir)
             print(f"TensorBoard logging enabled at {args.tensorboard_dir}")
-        except ImportError:
+        else:
             print("TensorBoard not available. Install torch.utils.tensorboard for logging.")
             tb_writer = None
     else:
