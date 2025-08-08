@@ -285,7 +285,7 @@ def init_optimizer_and_grad_accumulator(
             optimizer_builder=lambda param_groups: AdamW(  # pylint: disable=E0601
                 param_groups,
                 # Always provide a weight_decay value, defaulting to 0.0 if None
-                weight_decay=optimizer_args.weight_decay if optimizer_args.weight_decay is not None else 0.0 if optimizer_args.weight_decay if optimizer_args.weight_decay is not None else 0.0 is not None else 0.0,
+                weight_decay=0.0 if optimizer_args.weight_decay is None else optimizer_args.weight_decay,
                 lr=optimizer_args.learning_rate_scheduler.learning_rate,
                 eps=optimizer_args.adam_eps,
                 betas=(optimizer_args.adam_beta1, optimizer_args.adam_beta2),

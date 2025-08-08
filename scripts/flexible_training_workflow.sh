@@ -264,6 +264,7 @@ else
 fi
 
 # Check if weight_decay is missing or None in the config and add it
+# See docs/WEIGHT_DECAY_FIX.md for details on this fix
 if ! grep -q "weight_decay:" "$CONFIG_TEMP" || grep -q "weight_decay: *null" "$CONFIG_TEMP"; then
     # Add or replace weight_decay with default value 0.01
     sed -i.bak '/optimizer:/,/zero_stage:/ s/\(weight_decay: *\)null/\10.01/' "$CONFIG_TEMP"

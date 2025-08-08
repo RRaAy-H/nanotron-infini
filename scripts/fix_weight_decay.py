@@ -19,17 +19,17 @@ def fix_file(file_path):
         with open(file_path, 'r') as f:
             content = f.read()
         
-        # Replace patterns where weight_decay might be None
+        # Replace patterns where weight_decay might be None - using a clearer syntax to avoid nested ifs
         modified = re.sub(
             r'weight_decay=([^,\)]+)',
-            r'weight_decay=\1 if \1 is not None else 0.0',
+            r'weight_decay=0.0 if \1 is None else \1',
             content
         )
         
         # Look for Adam parameter updates without checks
         modified = re.sub(
             r'param\.mul\(1 - lr \* weight_decay\)',
-            r'param.mul(1 - lr * (weight_decay if weight_decay is not None else 0.0))',
+            r'param.mul(1 - lr * (0.0 if weight_decay is None else weight_decay))',
             modified
         )
         
