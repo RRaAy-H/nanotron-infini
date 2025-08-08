@@ -43,6 +43,8 @@ from typing import Dict, Optional, cast, List
 # Add the project root to Python path to access the nanotron module
 root_dir = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root_dir))
+# Add the src directory to Python path (important for nanotron imports)
+sys.path.insert(0, os.path.join(str(root_dir), 'src'))
 
 # Check for Flash Attention errors early
 def check_flash_attention():
@@ -89,7 +91,9 @@ try:
         DatasetStageArgs,
         PretrainDatasetsArgs,
         ModelArgs,
-        TrainingArgs,
+        TokensArgs,
+        OptimizerArgs,
+        GeneralArgs,
         Config as NanotronConfig,
     )
     from nanotron.dataloader import (
