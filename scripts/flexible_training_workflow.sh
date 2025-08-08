@@ -167,11 +167,18 @@ if [[ -n "$RAW_DATA" ]]; then
         
         # Run preprocessing script
         if [[ -f "$PROJECT_ROOT/scripts/preprocessing/preprocess_data_fixed.py" ]]; then
-            python "$PROJECT_ROOT/scripts/preprocessing/preprocess_data_fixed.py" \
-                --config-file "$CONFIG_FILE" \
-                --output-dir "$OUTPUT_DIR" \
-                --gpu-id "$GPU_ID" \
-                ${VERBOSE} && PREPROCESSED_DATA=$(find "$OUTPUT_DIR" -name "preprocessed_*" -type d | sort | tail -n 1)
+            PREPROCESS_CMD="python \"$PROJECT_ROOT/scripts/preprocessing/preprocess_data_fixed.py\" \
+                --config-file \"$CONFIG_FILE\" \
+                --output-dir \"$OUTPUT_DIR\" \
+                --gpu-id \"$GPU_ID\""
+                
+            # Only add verbose flag if verbose is true
+            if [[ "$VERBOSE" = true ]]; then
+                PREPROCESS_CMD="$PREPROCESS_CMD --verbose"
+            fi
+            
+            # Execute the command
+            eval $PREPROCESS_CMD && PREPROCESSED_DATA=$(find "$OUTPUT_DIR" -name "preprocessed_*" -type d | sort | tail -n 1)
         else
             echo "Error: Preprocessing script not found."
             exit 1

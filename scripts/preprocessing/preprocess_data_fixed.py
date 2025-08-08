@@ -286,12 +286,18 @@ def get_args():
     parser.add_argument("--gpu-id", type=int, default=0, help="GPU ID to use for preprocessing (default: 0)")
     parser.add_argument("--no-gpu", action="store_true", help="Disable GPU acceleration for preprocessing")
     parser.add_argument("--batch-size", type=int, default=2048, help="Batch size for GPU processing (default: 2048)")
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
     return parser.parse_args()
 
 
 def main():
     """Main entry point."""
     args = get_args()
+    
+    # Configure logging level
+    if args.verbose:
+        os.environ["NANOTRON_LOG_LEVEL"] = "debug"
+        print("Verbose logging enabled")
     
     # Set up environment
     setup_environment(gpu_id=args.gpu_id, use_gpu=not args.no_gpu)
