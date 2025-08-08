@@ -38,8 +38,6 @@ if args.verbose:
     print("Verbose logging enabled")
 
 # Import after setting environment variables
-import torch
-from torch.utils.data import DataLoader
 from dataclasses import dataclass, field
 
 # Import SummaryWriter conditionally to avoid errors if not available
@@ -112,10 +110,8 @@ def main():
     from nanotron.dataloader import DataCollatorForCLM
     from nanotron.parallel.pipeline_parallel.utils import get_input_output_pp_ranks
     
-    # We need to get the model first, which is initialized during trainer creation
-    # Then we can use get_input_output_pp_ranks with the model
-    
     # Get the correct input and output pipeline parallel ranks
+    # These will be determined based on the trainer's model
     input_pp_rank, output_pp_rank = get_input_output_pp_ranks(model=trainer.model)
     
     # Initialize data collator with proper parameters
@@ -126,13 +122,15 @@ def main():
         parallel_context=trainer.parallel_context,
     )
     
-    # We've already imported DataLoader at the top
+    # Create DataLoader for training
+    print(f"Creating DataLoader with batch size: {trainer.config.tokens.micro_batch_size}")
     train_loader = DataLoader(
         dataset=train_dataset,
         batch_size=trainer.config.tokens.micro_batch_size,
         shuffle=True,
         collate_fn=data_collator,
     )
+    print(f"DataLoader created successfully with {len(train_dataset)} samples")
     
     # Set up TensorBoard if requested
     if args.tensorboard_dir:
@@ -147,12 +145,16 @@ def main():
         tb_writer = None
     
     # Train model
-    print("Starting training")
+    device = f"cuda:0" if torch.cuda.is_available() else "cpu"
+    print(f"Starting training on device: {device}")
+    print(f"Model type: {'baseline' if args.disable_infini_attn else 'Infini-Attention'}")
+    
     try:
+        print("Calling trainer.train() with the dataloader...")
         trainer.train(
-            train_dataloader=train_loader,
+            dataloader_or_dls={"train": train_loader},
             tokenizer=tokenizer,
-            device=f"cuda:0" if torch.cuda.is_available() else "cpu",
+            device=device,
         )
         print("Training completed successfully!")
     
