@@ -1,0 +1,35 @@
+# Test configuration file for wrapper script testing
+# This is a minimal configuration that can be used to test the weight_decay fix
+
+name: "test_wrapper_config"
+
+model:
+  name: "llama"
+  hidden_size: 256
+  num_attention_heads: 4
+  num_hidden_layers: 2
+  intermediate_size: 512
+  vocab_size: 32000
+  max_position_embeddings: 512
+
+optimizer:
+  name: "adam"
+  lr: 0.001
+  # weight_decay is intentionally missing or set to null to trigger the fix
+  weight_decay: null
+  zero_stage: 0
+  torch_adam_is_fused: false
+
+tokens:
+  sequence_length: 128
+  micro_batch_size: 4
+
+training:
+  batch_size: 8
+  micro_steps: 2
+  num_epochs: 1
+  gradient_accumulation_steps: 1
+
+infini_attention:
+  segment_length: 64
+  turn_on_memory: true

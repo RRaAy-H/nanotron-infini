@@ -314,35 +314,19 @@ fi
 # Ensure the pre-import script with Adam optimizer patches is used in training
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 
-# Create a wrapper Python script that will import our patches before running the training script
-WRAP_SCRIPT=$(mktemp)
-cat > "$WRAP_SCRIPT" << EOF
-#!/usr/bin/env python
-import sys
-import os
+# Use the permanent wrapper script instead of creating a temporary one
+WRAP_SCRIPT="$PROJECT_ROOT/scripts/wrapper_script.py"
 
-# Import our patches first
-try:
-    sys.path.insert(0, "$PROJECT_ROOT/scripts")
-    import preimport
-    print("Adam optimizer patches applied successfully")
-except ImportError as e:
-    print(f"Warning: Failed to import pre-import patches: {e}")
+# Check if the wrapper script exists
+if [[ ! -f "$WRAP_SCRIPT" ]]; then
+    echo "Error: Wrapper script not found at $WRAP_SCRIPT"
+    echo "Please make sure the wrapper_script.py file exists in the scripts directory"
+    exit 1
+fi
 
-# Now run the actual training script
-sys.path.insert(0, "$PROJECT_ROOT")
-sys.path.insert(0, "$PROJECT_ROOT/src")
-
-# Get the script path and arguments
-script_path = "$PROJECT_ROOT/scripts/run_direct_training.py"
-script_args = sys.argv[1:]
-
-# Run the script with exec
-os.execvp("python", ["python", script_path] + script_args)
-EOF
-
+# Ensure the wrapper script is executable
 chmod +x "$WRAP_SCRIPT"
-echo "Created wrapper script with Adam optimizer patches"
+echo "Using wrapper script with Adam optimizer patches: $WRAP_SCRIPT"
 
 # Suppress Flash Attention warnings as a fallback
 export PYTHONWARNINGS="ignore::FutureWarning"

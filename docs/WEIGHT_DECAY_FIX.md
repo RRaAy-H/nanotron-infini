@@ -62,19 +62,35 @@ fi
 import preimport  # This applies the patches automatically
 ```
 
-4. **Wrapper Script Technique**: Created a dynamic wrapper script that:
+4. **Wrapper Script Technique**: Created a dedicated wrapper script (`wrapper_script.py`) that:
    - Imports our patches first
    - Then runs the actual training script with all arguments passed through
+   
+   **Important Note:** The wrapper script must be saved as a file with a fixed path, not a temporary file. Using a temporary file can cause Python to fail with a "__main__ module" error because Python tries to interpret the script filename as a module name.
 
 ## Usage
 
 The fix is automatically applied when running the `flexible_training_workflow.sh` script. The script:
 
 1. Ensures the config file has a valid weight_decay value 
-2. Creates a temporary wrapper script that applies our patches
+2. Uses a dedicated wrapper script (`scripts/wrapper_script.py`) that applies our patches
 3. Runs the training script through this wrapper
 
 No additional steps are required as the fix is now fully integrated into the workflow.
+
+## Troubleshooting
+
+If you encounter issues with the wrapper script, you can test it using:
+
+```bash
+# Test the wrapper with a simple script
+./scripts/test_wrapper.sh
+```
+
+Common issues:
+- **`__main__ module` error**: This can happen if the wrapper script is created as a temporary file without a proper path. Use the permanent `wrapper_script.py` instead.
+- **Import errors**: Ensure that the Python path includes the project root and script directories.
+- **Permission denied**: Make sure the wrapper script has execute permissions with `chmod +x scripts/wrapper_script.py`.
 
 ## Note for Developers
 
