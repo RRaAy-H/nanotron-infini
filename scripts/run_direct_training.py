@@ -101,7 +101,23 @@ def main():
 
     # Set up data collator
     from nanotron.dataloader import DataCollatorForCLM, get_train_dataloader
-    data_collator = DataCollatorForCLM(tokenizer=tokenizer)
+    from nanotron.parallel import ParallelContext
+
+    # Create a simple parallel context for single GPU training
+    parallel_context = ParallelContext(
+        tensor_parallel_size=1,
+        pipeline_parallel_size=1,
+        data_parallel_size=1,
+        expert_parallel_size=1
+    )
+    
+    # Initialize data collator with proper parameters
+    data_collator = DataCollatorForCLM(
+        sequence_length=trainer.config.tokens.sequence_length,
+        input_pp_rank=0,
+        output_pp_rank=0,
+        parallel_context=parallel_context
+    )
     
     # Create dataloader
     train_loader = get_train_dataloader(
