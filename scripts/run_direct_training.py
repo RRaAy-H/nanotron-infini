@@ -112,8 +112,11 @@ def main():
     from nanotron.dataloader import DataCollatorForCLM
     from nanotron.parallel.pipeline_parallel.utils import get_input_output_pp_ranks
     
+    # We need to get the model first, which is initialized during trainer creation
+    # Then we can use get_input_output_pp_ranks with the model
+    
     # Get the correct input and output pipeline parallel ranks
-    input_pp_rank, output_pp_rank = get_input_output_pp_ranks(trainer.parallel_context.pipeline_parallel_size)
+    input_pp_rank, output_pp_rank = get_input_output_pp_ranks(model=trainer.model)
     
     # Initialize data collator with proper parameters
     data_collator = DataCollatorForCLM(
@@ -123,8 +126,7 @@ def main():
         parallel_context=trainer.parallel_context,
     )
     
-    # Use a custom DataLoader instead of get_train_dataloader which has different parameters
-    from torch.utils.data import DataLoader
+    # We've already imported DataLoader at the top
     train_loader = DataLoader(
         dataset=train_dataset,
         batch_size=trainer.config.tokens.micro_batch_size,
