@@ -19,7 +19,13 @@ We implemented multiple fixes to ensure weight decay always has a proper numeric
 1. **Default Value in `helpers.py`**: Modified the optimizer initialization to ensure weight decay is never None:
 
 ```python
-weight_decay=0.0 if optimizer_args.weight_decay is None else optimizer_args.weight_decay
+# Ensure weight_decay is always a valid float value
+wd = 0.0
+if hasattr(optimizer_args, 'weight_decay') and optimizer_args.weight_decay is not None:
+    wd = optimizer_args.weight_decay
+    
+# Then use wd in the optimizer constructor
+weight_decay=wd
 ```
 
 2. **Config File Validation**: Added code to the `flexible_training_workflow.sh` script to ensure the config file always has a valid `weight_decay` value:
@@ -37,17 +43,16 @@ if ! grep -q "weight_decay:" "$CONFIG_TEMP" || grep -q "weight_decay: *null" "$C
 fi
 ```
 
-3. **Runtime Fixes**: Created `fix_weight_decay.py` script to scan and fix code patterns that might cause NoneType errors with weight decay.
+3. **Manual Code Updates**: Updated the optimizer builder code to use a robust approach that doesn't rely on one-line conditionals which could be corrupted by automated fixes.
 
 ## Usage
 
-The fix is automatically applied when running the `flexible_training_workflow.sh` script. If you need to manually fix weight decay issues:
+The fix is automatically applied when running the `flexible_training_workflow.sh` script. The script:
 
-```bash
-python scripts/fix_weight_decay.py
-```
+1. Ensures the config file has a valid weight_decay value
+2. Uses the built-in weight decay handling in helpers.py
 
-This will scan the codebase for potential issues and fix them.
+No additional steps are required as the fix is now fully integrated into the codebase.
 
 ## Note for Developers
 

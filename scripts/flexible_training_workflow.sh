@@ -311,12 +311,9 @@ if [[ -f "$PROJECT_ROOT/scripts/fix_flash_attention_warnings.py" ]]; then
     python "$PROJECT_ROOT/scripts/fix_flash_attention_warnings.py" || true
 fi
 
-# Fix weight decay NoneType errors
-if [[ -f "$PROJECT_ROOT/scripts/fix_weight_decay.py" ]]; then
-    echo "Fixing potential weight decay NoneType errors..."
-    python "$PROJECT_ROOT/scripts/fix_weight_decay.py" || true
-    echo "Weight decay fixes applied"
-fi
+# We now handle weight decay issues directly in the code and config
+# No need to run the fix_weight_decay.py script which might introduce syntax errors
+echo "Using built-in weight decay handling (0.0 fallback for None values)"
 
 # Suppress Flash Attention warnings as a fallback
 export PYTHONWARNINGS="ignore::FutureWarning"
