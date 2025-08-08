@@ -55,16 +55,26 @@ if ! grep -q "weight_decay:" "$CONFIG_TEMP" || grep -q "weight_decay: *null" "$C
 fi
 ```
 
-3. **Manual Code Updates**: Updated the optimizer builder code to use a robust approach that doesn't rely on one-line conditionals which could be corrupted by automated fixes.
+3. **Pre-import Script**: Created a `preimport.py` script that applies the patch before any other code runs:
+
+```python
+# This is imported before any other imports in the training script
+import preimport  # This applies the patches automatically
+```
+
+4. **Wrapper Script Technique**: Created a dynamic wrapper script that:
+   - Imports our patches first
+   - Then runs the actual training script with all arguments passed through
 
 ## Usage
 
 The fix is automatically applied when running the `flexible_training_workflow.sh` script. The script:
 
-1. Ensures the config file has a valid weight_decay value
-2. Uses the built-in weight decay handling in helpers.py
+1. Ensures the config file has a valid weight_decay value 
+2. Creates a temporary wrapper script that applies our patches
+3. Runs the training script through this wrapper
 
-No additional steps are required as the fix is now fully integrated into the codebase.
+No additional steps are required as the fix is now fully integrated into the workflow.
 
 ## Note for Developers
 

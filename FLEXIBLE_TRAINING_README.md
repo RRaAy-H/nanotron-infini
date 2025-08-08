@@ -8,7 +8,8 @@ This document summarizes the fixes and improvements made to the Infini-Llama tra
    - Disabled fused Adam optimizer by default to avoid type errors during training
    - Added `--enable-fused-adam` flag to optionally enable it if your environment supports it
    - Fixed NoneType error in weight decay handling (added default value 0.01)
-   - Implemented robust weight_decay default handling in the optimizer initialization code
+   - Implemented dynamic monkey patching of PyTorch Adam optimizer to handle None weight_decay values
+   - Created wrapper script approach to ensure patches are applied before any code runs
 
 2. **Fixed Flash Attention Warnings**
    - Created `fix_flash_attention_warnings.py` script to automatically patch Flash Attention library
