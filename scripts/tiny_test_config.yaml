@@ -1,0 +1,45 @@
+# Configuration for testing Infini-Llama with a tiny dataset
+# This is used for validating the workflow with minimal resources
+
+trainer:
+  train_steps: 100
+  log_every: 10
+  save_every: 50
+  eval_every: 50
+
+model:
+  name: llama
+  hidden_size: 512
+  num_attention_heads: 8
+  num_hidden_layers: 4
+  intermediate_size: 1024
+  vocab_size: 32000
+  max_position_embeddings: 512
+
+tokenizer:
+  tokenizer_name_or_path: meta-llama/Llama-2-7b-hf
+
+optimizer:
+  learning_rate: 0.0001
+  weight_decay: 0.01
+  zero_stage: 0
+
+data_stages:
+  - name: main
+    start_training_step: 0
+    data:
+      micro_batch_size: 2
+      global_batch_size: 8
+      sequence_length: 128
+      dataset:
+        hf_dataset_or_datasets: /data1/dataset/HuggingFaceFW/processed/tiny
+        text_column_name: text
+        dataset_processing_num_proc_per_process: 2
+        hf_dataset_splits: train
+        dataset_overwrite_cache: true
+
+parallelism:
+  tensor_parallel_size: 1
+  pipeline_parallel_size: 1
+  data_parallel_size: 1
+  expert_parallel_size: 1
