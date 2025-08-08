@@ -30,6 +30,7 @@ GPU_ID=0
 TENSORBOARD_DIR="tensorboard_logs/train_$(date +"%Y%m%d_%H%M%S")"
 USE_GPU_DATALOADER=true
 FORCE_PREPROCESS=false
+DISABLE_FUSED_ADAM=true  # Set to true to avoid fused Adam optimizer errors
 VERBOSE=false
 
 # Parse command line arguments
@@ -63,6 +64,10 @@ while [[ $# -gt 0 ]]; do
             RUN_BOTH_MODELS=true
             shift
             ;;
+        --enable-fused-adam)
+            DISABLE_FUSED_ADAM=false
+            shift
+            ;;
         --tensorboard-dir)
             TENSORBOARD_DIR="$2"
             shift 2
@@ -92,6 +97,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --disable-infini-attn     Disable Infini-Attention (run baseline model)"
             echo "  --gpu ID                  GPU ID to use (default: 0)"
             echo "  --run-both-models         Run both Infini-Attention and baseline models (requires 2+ GPUs)"
+            echo "  --enable-fused-adam       Enable fused Adam optimizer (default: disabled to avoid errors)"
             echo "  --tensorboard-dir PATH    Directory for TensorBoard logs"
             echo "  --no-gpu-dataloader       Disable GPU-accelerated dataloader"
             echo "  --force-preprocess        Force preprocessing even if data exists"
@@ -239,6 +245,21 @@ mkdir -p "$TRAINING_LOGS_DIR"
 chmod -R 755 "$TRAINING_LOGS_DIR"
 echo "Training logs will be saved to: $TRAINING_LOGS_DIR"
 
+# Set up training logs directory
+export TRAINING_LOGS_DIR="$PROJECT_ROOT/training_logs"
+mkdir -p "$TRAINING_LOGS_DIR"
+# Ensure write permissions
+chmod -R 755 "$TRAINING_LOGS_DIR"
+echo "Training logs will be saved to: $TRAINING_LOGS_DIR"
+
+# Temporarily modify the config if needed to disable fused Adam
+if [[ "$DISABLE_FUSED_ADAM" = true ]]; then
+    CONFIG_TEMP="${CONFIG_FILE%.yaml}_temp.yaml"
+    cat "$CONFIG_FILE" | sed 's/torch_adam_is_fused: true/torch_adam_is_fused: false/g' > "$CONFIG_TEMP"
+    CONFIG_FILE="$CONFIG_TEMP"
+    echo "Created temporary config with fused Adam disabled to avoid optimizer errors"
+fi
+
 # Configure Infini-Attention constants
 python -c "
 from dataclasses import dataclass, field
@@ -266,6 +287,10 @@ class Config:
 constants.CONFIG = Config()
 print('Infini attention constants configured successfully!')
 "
+
+# Suppress Flash Attention warnings
+export PYTHONWARNINGS="ignore::FutureWarning"
+echo "Suppressed Flash Attention FutureWarnings"
 
 # Check if we should run both models
 if [[ "$RUN_BOTH_MODELS" = true ]]; then

@@ -469,8 +469,9 @@ class _MQAColumnLinearReduceScatterAsyncCommunication(torch.autograd.Function):
         # grad_q_weight = flat_grad_q.t().matmul(flat_gathered_x)
         # grad_q_bias = flat_grad_q.sum(dim=0) if use_q_bias else None
 
-        flat_gathered_x = gathered_x.view(math.prod(gathered_x.shape[:-1]), gathered_x.shape[-1])
-        flat_grad_qkv = grad_qkv.view(math.prod(grad_qkv.shape[:-1]), grad_qkv.shape[-1])
+        # Use reshape instead of view to handle non-contiguous tensors
+        flat_gathered_x = gathered_x.reshape(math.prod(gathered_x.shape[:-1]), gathered_x.shape[-1])
+        flat_grad_qkv = grad_qkv.reshape(math.prod(grad_qkv.shape[:-1]), grad_qkv.shape[-1])
         grad_q_weight, grad_kv_weight = torch.split(
             flat_grad_qkv.t().matmul(flat_gathered_x),
             split_size_or_sections=[split_q_and_kv_id, grad_qkv.shape[-1] - split_q_and_kv_id],

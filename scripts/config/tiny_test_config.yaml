@@ -75,7 +75,7 @@ optimizer:
     lr_warmup_steps: 20
     lr_warmup_style: linear
     min_decay_lr: 1.0e-05
-  torch_adam_is_fused: true
+  torch_adam_is_fused: false
   weight_decay: 0.01
   zero_stage: 0
 
