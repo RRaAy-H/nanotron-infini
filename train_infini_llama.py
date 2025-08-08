@@ -40,8 +40,10 @@ from pathlib import Path
 from datetime import datetime
 from typing import Dict, Optional, cast, List
 
-# Add the src directory to Python path (important for nanotron imports)
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add the project root and src directories to Python path (important for nanotron imports)
+root_dir = Path(__file__).resolve().parent
+sys.path.insert(0, str(root_dir))
+sys.path.insert(0, os.path.join(str(root_dir), 'src'))
 
 # Check for Flash Attention errors early
 def check_flash_attention():
@@ -110,7 +112,8 @@ try:
         print("GPU dataloader not available, falling back to CPU processing.")
     
     from nanotron import logging
-    from nanotron.models.llama import LlamaForCausalLM
+    # Use LlamaForTraining instead of LlamaForCausalLM (which doesn't exist)
+    from nanotron.models.llama import LlamaForTraining as LlamaForCausalLM
     from nanotron.optim import (
         get_optimizer,
         get_lr_scheduler,
