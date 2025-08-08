@@ -110,8 +110,4 @@ tokenizer:
   tokenizer_name_or_path: meta-llama/Llama-2-7b-hf
   tokenizer_revision: null
 
-tokens:
-  batch_accumulation_per_replica: 1
-  sequence_length: 128
-  train_steps: 100
-  tokens_per_batch: 8192
+# Removing tokens section to fix preprocessing errors
