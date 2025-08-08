@@ -200,11 +200,11 @@ else
 fi
 
 # Build training command
-TRAIN_CMD="python $PROJECT_ROOT/train_infini_llama.py \
+TRAIN_CMD="python $PROJECT_ROOT/scripts/run_direct_training.py \
     --config-file \"$CONFIG_FILE\" \
-    --gpu-device cuda:0 \
-    --tensorboard-dir \"$TENSORBOARD_DIR\" \
-    --data-dir \"$PREPROCESSED_DATA\""
+    --data-dir \"$PREPROCESSED_DATA\" \
+    --gpu-id \"$GPU_ID\" \
+    --tensorboard-dir \"$TENSORBOARD_DIR\""
 
 # Add optional flags
 if [[ "$DISABLE_INFINI_ATTN" = true ]]; then
@@ -221,6 +221,37 @@ fi
 
 # Set CUDA_VISIBLE_DEVICES
 export CUDA_VISIBLE_DEVICES=$GPU_ID
+
+# Set up environment variables for proper path resolution
+export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
+
+# Configure Infini-Attention constants
+python -c "
+from dataclasses import dataclass, field
+import sys
+sys.path.append('$PROJECT_ROOT/src')
+from nanotron import constants
+
+@dataclass
+class InfiniAttentionConfig:
+    segment_length: int = 64
+    turn_on_memory: bool = True
+    balance_init_type: str = 'zeros'
+    balance_act_type: str = 'orig_sigmoid'
+    balance_factor_lr: float = 0.001
+    logging: bool = False
+    logging_interval: int = 100
+    log_grad: bool = False
+    log_segment_acts: bool = False
+
+@dataclass
+class Config:
+    infini_attention: InfiniAttentionConfig = field(default_factory=InfiniAttentionConfig)
+
+# Set up the configuration
+constants.CONFIG = Config()
+print('Infini attention constants configured successfully!')
+"
 
 # Run training
 echo "Starting training with command:"

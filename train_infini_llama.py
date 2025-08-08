@@ -114,11 +114,10 @@ try:
     from nanotron import logging
     # Use LlamaForTraining instead of LlamaForCausalLM (which doesn't exist)
     from nanotron.models.llama import LlamaForTraining as LlamaForCausalLM
-    from nanotron.optim import (
-        get_optimizer,
-        get_lr_scheduler,
-        get_optimizer_groups,
-        initialize_optimizer_state,
+    # Import helpers for optimizer instead of non-existent direct imports
+    from nanotron.helpers import (
+        init_optimizer_and_grad_accumulator,
+        lr_scheduler_builder,
     )
     from nanotron.parallel import ParallelContext
     from nanotron.parallel.parameters import set_parameter_list_requires_grad
