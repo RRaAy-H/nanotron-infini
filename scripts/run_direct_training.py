@@ -148,13 +148,20 @@ def main():
     device = f"cuda:0" if torch.cuda.is_available() else "cpu"
     print(f"Starting training on device: {device}")
     print(f"Model type: {'baseline' if args.disable_infini_attn else 'Infini-Attention'}")
+    print(f"Config file: {args.config_file}")
+    print(f"Dataset size: {len(train_dataset)} samples")
+    print(f"Batch size: {trainer.config.tokens.micro_batch_size}")
+    print(f"Sequence length: {trainer.config.tokens.sequence_length}")
+    print(f"TensorBoard logging: {'Enabled' if args.tensorboard_dir else 'Disabled'}")
     
     try:
         print("Calling trainer.train() with the dataloader...")
+        print(f"Using training stage name: 'Training Stage' as defined in the config")
+        # Pass the dataloader with the stage name matching the config and additional parameters as kwargs
         trainer.train(
-            dataloader_or_dls={"train": train_loader},
+            dataloader_or_dls={"Training Stage": train_loader}, 
             tokenizer=tokenizer,
-            device=device,
+            device=device
         )
         print("Training completed successfully!")
     

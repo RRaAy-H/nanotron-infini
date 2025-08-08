@@ -57,6 +57,10 @@ while [[ $# -gt 0 ]]; do
             GPU_ID="$2"
             shift 2
             ;;
+        --run-both-models)
+            RUN_BOTH_MODELS=true
+            shift
+            ;;
         --tensorboard-dir)
             TENSORBOARD_DIR="$2"
             shift 2
@@ -85,6 +89,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --output-dir PATH         Directory to save preprocessed data (default: preprocessed_data)"
             echo "  --disable-infini-attn     Disable Infini-Attention (run baseline model)"
             echo "  --gpu ID                  GPU ID to use (default: 0)"
+            echo "  --run-both-models         Run both Infini-Attention and baseline models (requires 2+ GPUs)"
             echo "  --tensorboard-dir PATH    Directory for TensorBoard logs"
             echo "  --no-gpu-dataloader       Disable GPU-accelerated dataloader"
             echo "  --force-preprocess        Force preprocessing even if data exists"
@@ -253,16 +258,95 @@ constants.CONFIG = Config()
 print('Infini attention constants configured successfully!')
 "
 
-# Run training
-echo "Starting training with command:"
-echo "$TRAIN_CMD"
-echo "-------------------------------------"
-eval $TRAIN_CMD
+# Check if we should run both models
+if [[ "$RUN_BOTH_MODELS" = true ]]; then
+    # Check if we have at least 2 GPUs
+    GPU_COUNT=$(nvidia-smi -L | wc -l)
+    if [[ $GPU_COUNT -lt 2 ]]; then
+        echo "Warning: Running both models requires at least 2 GPUs, but only $GPU_COUNT detected."
+        echo "Will run models sequentially on GPU $GPU_ID instead."
+        RUN_BOTH_MODELS=false
+    else
+        echo "-------------------------------------"
+        echo "Running both models in parallel:"
+        echo "Infini-Attention model on GPU 0"
+        echo "Baseline model on GPU 1"
+        echo "-------------------------------------"
+        
+        # Create separate tensorboard dirs
+        INFINI_TB_DIR="tensorboard_logs/infini_$(date +"%Y%m%d_%H%M%S")"
+        BASELINE_TB_DIR="tensorboard_logs/baseline_$(date +"%Y%m%d_%H%M%S")"
+        mkdir -p "$INFINI_TB_DIR"
+        mkdir -p "$BASELINE_TB_DIR"
+        
+        # Build commands for both models
+        INFINI_CMD="CUDA_VISIBLE_DEVICES=0 python $PROJECT_ROOT/scripts/run_direct_training.py \
+            --config-file \"$CONFIG_FILE\" \
+            --data-dir \"$PREPROCESSED_DATA\" \
+            --gpu-id 0 \
+            --tensorboard-dir \"$INFINI_TB_DIR\""
+        
+        BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 python $PROJECT_ROOT/scripts/run_direct_training.py \
+            --config-file \"$CONFIG_FILE\" \
+            --data-dir \"$PREPROCESSED_DATA\" \
+            --gpu-id 0 \
+            --disable-infini-attn \
+            --tensorboard-dir \"$BASELINE_TB_DIR\""
+        
+        # Add optional flags to both commands
+        if [[ "$USE_GPU_DATALOADER" = true ]]; then
+            INFINI_CMD="$INFINI_CMD --use-gpu-dataloader"
+            BASELINE_CMD="$BASELINE_CMD --use-gpu-dataloader"
+        fi
+        
+        if [[ "$VERBOSE" = true ]]; then
+            INFINI_CMD="$INFINI_CMD --verbose"
+            BASELINE_CMD="$BASELINE_CMD --verbose"
+        fi
+        
+        # Run both commands in parallel
+        echo "Starting Infini-Attention model training..."
+        eval "$INFINI_CMD" > infini_training.log 2>&1 &
+        INFINI_PID=$!
+        echo "Infini-Attention training started with PID: $INFINI_PID"
+        
+        echo "Starting Baseline model training..."
+        eval "$BASELINE_CMD" > baseline_training.log 2>&1 &
+        BASELINE_PID=$!
+        echo "Baseline training started with PID: $BASELINE_PID"
+        
+        # Wait for both processes to complete
+        echo "Waiting for both training processes to complete..."
+        wait $INFINI_PID
+        INFINI_STATUS=$?
+        wait $BASELINE_PID
+        BASELINE_STATUS=$?
+        
+        # Print completion message
+        echo "-------------------------------------"
+        echo "Parallel training completed!"
+        echo "Infini-Attention model status: $INFINI_STATUS (0 = success)"
+        echo "Baseline model status: $BASELINE_STATUS (0 = success)"
+        echo "Infini-Attention logs saved to: $INFINI_TB_DIR"
+        echo "Baseline logs saved to: $BASELINE_TB_DIR"
+        echo "Log files: infini_training.log and baseline_training.log"
+        echo "To compare training progress: tensorboard --logdir_spec=infini:$INFINI_TB_DIR,baseline:$BASELINE_TB_DIR"
+        echo "-------------------------------------"
+    fi
+fi
 
-# Print completion message
-echo "-------------------------------------"
-echo "Training completed!"
-echo "Model type: $MODEL_TYPE"
-echo "TensorBoard logs saved to: $TENSORBOARD_DIR"
-echo "To view training progress: tensorboard --logdir $TENSORBOARD_DIR"
-echo "-------------------------------------"
+# Run single model if not running both
+if [[ "$RUN_BOTH_MODELS" != true ]]; then
+    echo "Starting training with command:"
+    echo "$TRAIN_CMD"
+    echo "-------------------------------------"
+    eval $TRAIN_CMD
+    
+    # Print completion message
+    echo "-------------------------------------"
+    echo "Training completed!"
+    echo "Model type: $MODEL_TYPE"
+    echo "TensorBoard logs saved to: $TENSORBOARD_DIR"
+    echo "To view training progress: tensorboard --logdir $TENSORBOARD_DIR"
+    echo "-------------------------------------"
+fi
