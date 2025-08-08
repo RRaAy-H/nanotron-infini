@@ -324,8 +324,9 @@ class _ColumnLinearAsyncCommunication(torch.autograd.Function):
         # Convert the tensor shapes to 2D for execution compatibility
         grad_output_first_dims, grad_output_last_dim = grad_output.shape[:-1], grad_output.shape[-1]
         total_tensor_first_dims, total_tensor_last_dim = total_tensor.shape[:-1], total_tensor.shape[-1]
-        grad_output = grad_output.view(math.prod(grad_output_first_dims), grad_output_last_dim)
-        total_tensor = total_tensor.view(math.prod(total_tensor_first_dims), total_tensor_last_dim)
+        # Use reshape instead of view to handle non-contiguous memory layouts
+        grad_output = grad_output.reshape(math.prod(grad_output_first_dims), grad_output_last_dim)
+        total_tensor = total_tensor.reshape(math.prod(total_tensor_first_dims), total_tensor_last_dim)
 
         handle: Optional[dist.Work] = None
         if tp_mode is TensorParallelLinearMode.REDUCE_SCATTER:
@@ -465,14 +466,16 @@ class _RowLinearAsyncCommunication(torch.autograd.Function):
         # Convert the tensor shapes to 2D for execution compatibility
         tensor = tensor.contiguous()
         tensor_first_dims, tensor_last_dim = tensor.shape[:-1], tensor.shape[-1]
-        tensor = tensor.view(math.prod(tensor_first_dims), tensor_last_dim)
+        # Use reshape instead of view to handle non-contiguous memory layouts
+        tensor = tensor.reshape(math.prod(tensor_first_dims), tensor_last_dim)
 
         # Convert the tensor shapes to 2D for execution compatibility
         total_grad_output_first_dims, total_grad_output_last_dim = (
             total_grad_output.shape[:-1],
             total_grad_output.shape[-1],
         )
-        total_grad_output = total_grad_output.view(math.prod(total_grad_output_first_dims), total_grad_output_last_dim)
+        # Use reshape instead of view to handle non-contiguous memory layouts
+        total_grad_output = total_grad_output.reshape(math.prod(total_grad_output_first_dims), total_grad_output_last_dim)
 
         # TODO @thomasw21: This sounds like we don't have the optimal physical layout
         grad_weight = total_grad_output.t().matmul(tensor)

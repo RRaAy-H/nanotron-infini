@@ -9,6 +9,8 @@
 # - Whether to enable or disable Infini-Attention
 # - Which GPU(s) to use
 #
+# Note: Includes fixes for tensor memory layout issues and training logs path
+#
 # Usage examples:
 # ./flexible_training_workflow.sh --raw-data /data1/dataset/HuggingFaceFW/processed/tiny --config-file scripts/config/tiny_test_config.yaml
 # ./flexible_training_workflow.sh --preprocessed-data tiny_test_data/preprocessed_20240808_123456 --config-file scripts/config/tiny_test_config.yaml --disable-infini-attn
