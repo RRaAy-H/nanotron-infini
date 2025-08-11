@@ -83,6 +83,9 @@ class PretrainDatasetsArgs:
     dataset_processing_num_proc_per_process: Optional[int] = 1
     dataset_overwrite_cache: Optional[bool] = False
     text_column_name: Optional[str] = None
+    # Local dataset support
+    data_dir: Optional[str] = None  # Directory containing local dataset files (e.g., parquet files)
+    data_files: Optional[Union[str, list]] = None  # Specific files or patterns for local datasets
 
     def __post_init__(self):
         if self.text_column_name is None:

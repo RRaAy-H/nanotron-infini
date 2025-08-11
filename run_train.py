@@ -81,6 +81,8 @@ def get_dataloader_from_data_stage(trainer: DistributedTrainer, data: DataArgs):
                 hf_dataset_or_datasets=data.dataset.hf_dataset_or_datasets,
                 hf_dataset_config_name=data.dataset.hf_dataset_config_name,
                 splits=data.dataset.hf_dataset_splits,
+                data_dir=getattr(data.dataset, 'data_dir', None),
+                data_files=getattr(data.dataset, 'data_files', None),
             )["train"]
 
             tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
