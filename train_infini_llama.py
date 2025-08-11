@@ -120,7 +120,7 @@ try:
         lr_scheduler_builder,
     )
     from nanotron.parallel import ParallelContext
-    from nanotron.parallel.parameters import set_parameter_list_requires_grad
+    # Remove the non-existent import
     from nanotron.parallel.pipeline_parallel.block import PipelineBlock
     from nanotron.parallel.pipeline_parallel.p2p import P2P
     from nanotron.parallel.tensor_parallel.enum import TensorParallelLinearMode
