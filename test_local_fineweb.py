@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Test script to verify the local FineWeb dataset integration works correctly.
 This script tests:
@@ -23,11 +24,11 @@ def test_configuration_loading():
         
         config_path = "fineweb_local_200m_infini_config.yaml"
         if not os.path.exists(config_path):
-            print(f"❌ Error: Config file not found: {config_path}")
+            print(f"ERROR: Config file not found: {config_path}")
             return False
             
         config = get_config_from_file(config_path)
-        print("✅ Configuration loaded successfully!")
+        print("SUCCESS: Configuration loaded successfully!")
         
         # Check key configuration elements
         print(f"Model hidden size: {config.model.model_config.hidden_size}")
@@ -41,7 +42,7 @@ def test_configuration_loading():
         return True
         
     except Exception as e:
-        print(f"❌ Error loading configuration: {e}")
+        print(f"ERROR loading configuration: {e}")
         traceback.print_exc()
         return False
 
@@ -57,7 +58,7 @@ def test_local_dataset_access():
         # Check if dataset directory exists
         dataset_path = "data1/dataset/HuggingFaceFW/fineweb/"
         if not os.path.exists(dataset_path):
-            print(f"❌ Dataset directory not found: {dataset_path}")
+            print(f"ERROR: Dataset directory not found: {dataset_path}")
             print(f"Please update the path in fineweb_local_200m_infini_config.yaml")
             return False
             
@@ -66,7 +67,7 @@ def test_local_dataset_access():
         print(f"Found {len(parquet_files)} parquet files in {dataset_path}")
         
         if len(parquet_files) == 0:
-            print("❌ No parquet files found in dataset directory")
+            print("ERROR: No parquet files found in dataset directory")
             return False
             
         # List first few files
@@ -78,7 +79,7 @@ def test_local_dataset_access():
         return True
         
     except Exception as e:
-        print(f"❌ Error accessing local dataset: {e}")
+        print(f"ERROR accessing local dataset: {e}")
         traceback.print_exc()
         return False
 
@@ -97,7 +98,7 @@ def test_dataset_loading():
         print("Loading small sample (10 examples)...")
         dataset = load_dataset("parquet", data_dir=dataset_path, split="train[:10]")
         
-        print(f"✅ Dataset loaded successfully!")
+        print(f"SUCCESS: Dataset loaded successfully!")
         print(f"Number of samples: {len(dataset)}")
         print(f"Columns: {dataset.column_names}")
         
@@ -107,12 +108,12 @@ def test_dataset_loading():
             print(f"Sample text (first 200 chars): {sample_text[:200]}...")
             print(f"Sample text length: {len(sample_text)} characters")
         else:
-            print(f"❌ Warning: 'text' column not found. Available columns: {dataset.column_names}")
+            print(f"WARNING: 'text' column not found. Available columns: {dataset.column_names}")
             
         return True
         
     except Exception as e:
-        print(f"❌ Error loading dataset: {e}")
+        print(f"ERROR loading dataset: {e}")
         traceback.print_exc()
         return False
 
@@ -137,7 +138,7 @@ def test_nanotron_integration():
         )
         
         train_dataset = raw_datasets["train"]
-        print(f"✅ Nanotron integration successful!")
+        print(f"SUCCESS: Nanotron integration successful!")
         print(f"Dataset type: {type(train_dataset)}")
         print(f"Number of samples: {len(train_dataset)}")
         print(f"Columns: {train_dataset.column_names}")
@@ -145,7 +146,7 @@ def test_nanotron_integration():
         return True
         
     except Exception as e:
-        print(f"❌ Error with nanotron integration: {e}")
+        print(f"ERROR with nanotron integration: {e}")
         traceback.print_exc()
         return False
 
@@ -169,7 +170,7 @@ def test_tokenizer():
         test_text = "Hello world! This is a test of the tokenizer."
         tokens = tokenizer(test_text)
         
-        print(f"✅ Tokenizer loaded successfully!")
+        print(f"SUCCESS: Tokenizer loaded successfully!")
         print(f"Test text: {test_text}")
         print(f"Tokens: {tokens['input_ids']}")
         print(f"Number of tokens: {len(tokens['input_ids'])}")
@@ -177,13 +178,13 @@ def test_tokenizer():
         return True
         
     except Exception as e:
-        print(f"❌ Error with tokenizer: {e}")
+        print(f"ERROR with tokenizer: {e}")
         traceback.print_exc()
         return False
 
 def main():
     """Run all tests."""
-    print("🧪 Testing Local FineWeb Dataset Integration")
+    print("Testing Local FineWeb Dataset Integration")
     print("This script verifies that all modifications work correctly.\n")
     
     tests = [
@@ -215,16 +216,16 @@ def main():
     ]
     
     for i, (name, result) in enumerate(zip(test_names, results)):
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = "PASS" if result else "FAIL"
         print(f"{i+1}. {name}: {status}")
     
     print(f"\nOverall: {passed}/{total} tests passed")
     
     if passed == total:
-        print("\n🎉 All tests passed! You're ready to start training with:")
+        print("\nAll tests passed! You're ready to start training with:")
         print("python run_train.py --config-file fineweb_local_200m_infini_config.yaml")
     else:
-        print(f"\n⚠️  {total - passed} test(s) failed. Please check the issues above.")
+        print(f"\n{total - passed} test(s) failed. Please check the issues above.")
         
     return passed == total
 
