@@ -97,58 +97,71 @@ if args.auto_detect_flash_attn:
 if need_to_disable_flash_attn:
     print("Flash Attention is disabled - will use standard attention implementation")
     
-    # Set environment variable for consistent behavior across all modules
+    # Set environment variables for consistent behavior across all modules
     os.environ["DISABLE_FLASH_ATTN"] = "1"
-    # Also set this environment variable for transformers library compatibility
     os.environ["USE_FLASH_ATTENTION"] = "0"
     
-    # Create mock flash attention modules instead of blocking imports completely
-    import types
+    # IMPORTANT: Don't create mock modules - they can cause issues with transformers
+    # Instead, we'll use environment variables and direct patching of transformers
     
-    # Create a mock flash_attn module with dummy implementations
-    mock_flash_attn = types.ModuleType('flash_attn')
-    sys.modules['flash_attn'] = mock_flash_attn
+    # Patch transformers to avoid Flash Attention imports
+    import importlib
     
-    # Create layers submodule
-    mock_layers = types.ModuleType('flash_attn.layers')
-    sys.modules['flash_attn.layers'] = mock_layers
-    mock_flash_attn.layers = mock_layers
-    
-    # Create rotary submodule
-    mock_rotary = types.ModuleType('flash_attn.layers.rotary')
-    sys.modules['flash_attn.layers.rotary'] = mock_rotary
-    mock_layers.rotary = mock_rotary
-    
-    # Create ops submodule
-    mock_ops = types.ModuleType('flash_attn.ops')
-    sys.modules['flash_attn.ops'] = mock_ops
-    mock_flash_attn.ops = mock_ops
-    
-    # Add dummy version attribute
-    mock_flash_attn.__version__ = "0.0.0-disabled"
-    
-    # Create dummy RotaryEmbedding class
-    class DummyRotaryEmbedding:
-        def __init__(self, *args, **kwargs):
-            print("Using dummy RotaryEmbedding (Flash Attention disabled)")
+    # Helper function to patch is_flash_attn_available functions to always return False
+    def patch_transformers_flash_attention():
+        """
+        Patch various transformers functions that check for Flash Attention availability
+        to always return False.
+        """
+        try:
+            # Import transformers utils
+            import transformers.utils.import_utils as import_utils
             
-        def __call__(self, *args, **kwargs):
-            raise NotImplementedError("Flash Attention is disabled")
+            # Backup original functions (for possible restoration)
+            if hasattr(import_utils, 'is_flash_attn_available'):
+                orig_is_flash_attn_available = import_utils.is_flash_attn_available
+                import_utils.is_flash_attn_available = lambda: False
+                
+            if hasattr(import_utils, 'is_flash_attn_2_available'):
+                orig_is_flash_attn_2_available = import_utils.is_flash_attn_2_available
+                import_utils.is_flash_attn_2_available = lambda: False
+            
+            # Explicitly set package check for flash_attn
+            def patched_is_package_available(pkg_name, *args, **kwargs):
+                if pkg_name == 'flash_attn':
+                    return False
+                return orig_is_package_available(pkg_name, *args, **kwargs)
+            
+            if hasattr(import_utils, '_is_package_available'):
+                orig_is_package_available = import_utils._is_package_available
+                import_utils._is_package_available = patched_is_package_available
+            
+            print("Successfully patched transformers to disable Flash Attention checks")
+            return True
+        except (ImportError, AttributeError) as e:
+            print(f"Warning: Could not patch transformers Flash Attention: {e}")
+            return False
     
-    # Add the dummy class to the mock module
-    mock_rotary.RotaryEmbedding = DummyRotaryEmbedding
+    # Try to patch transformers directly
+    patch_result = patch_transformers_flash_attention()
     
-    print("Mock Flash Attention modules created for compatibility")
+    # If direct patching didn't work, set additional environment variables
+    # that transformers might check for flash attention availability
+    if not patch_result:
+        os.environ["TRANSFORMERS_NO_FLASH_ATTENTION"] = "1"
+        os.environ["TRANSFORMERS_DISABLE_FLASH_ATTN_IMPORT"] = "1"
+        print("Set additional environment variables to prevent Flash Attention usage in transformers")
     
-    # Try to prevent flash_attn imports in modules that might use it
-    try:
-        import transformers.models.llama.modeling_llama
-        # Monkey patch transformers to avoid flash attention usage
-        if hasattr(transformers.models.llama.modeling_llama, "_is_flash_attn_available"):
-            transformers.models.llama.modeling_llama._is_flash_attn_available = lambda: False
-            print("Successfully patched transformers to avoid Flash Attention usage")
-    except (ImportError, AttributeError):
-        pass
+    # Try to directly modify sys.modules to prevent flash_attn import from failing
+    # but don't create complex mock modules that could cause issues
+    if 'flash_attn' in sys.modules:
+        print("Removing existing flash_attn from sys.modules to prevent import issues")
+        del sys.modules['flash_attn']
+    
+    print("Flash Attention disabled via environment variables and transformers patching")
+        
+    # When transformers tries to import flash_attn, it will get None or ImportError
+    # which is safer than providing a mock module with incomplete functionality
     # Set timeouts to minimal values to fail fast
     os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "1"
     os.environ["REQUESTS_CA_BUNDLE"] = ""
