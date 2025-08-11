@@ -225,15 +225,44 @@ class OneForwardOneBackwardPipelineEngine(PipelineEngine):
         super().__init__()
         self.idx = 0
 
+        import os
         from transformers import AutoTokenizer
 
+        # Check if we're in offline mode
+        offline_mode = bool(os.environ.get('HF_HUB_OFFLINE', False))
+        
         # Use the tokenizer specified in the config, defaulting to a standard one if not available
         try:
             # This will be replaced with the tokenizer from the config at runtime
-            self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
-        except:
+            if offline_mode:
+                # In offline mode, use local_files_only=True to prevent download attempts
+                logger.info("Using offline mode for tokenizer initialization")
+                self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf", local_files_only=True)
+            else:
+                self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-2-7b-hf")
+        except Exception as e:
+            # Log the exception to help with debugging
+            logger.warning(f"Failed to load primary tokenizer: {str(e)}")
+            
             # Fallback to a simpler tokenizer that's more likely to be accessible
-            self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+            try:
+                if offline_mode:
+                    logger.info("Trying fallback tokenizer in offline mode")
+                    self.tokenizer = AutoTokenizer.from_pretrained("gpt2", local_files_only=True)
+                else:
+                    self.tokenizer = AutoTokenizer.from_pretrained("gpt2")
+            except Exception as e2:
+                logger.warning(f"Failed to load fallback tokenizer: {str(e2)}")
+                
+                # Last resort: create a basic tokenizer that doesn't require downloads
+                from transformers import PreTrainedTokenizer
+                logger.info("Creating basic tokenizer as last resort")
+                self.tokenizer = PreTrainedTokenizer(
+                    unk_token="[UNK]",
+                    pad_token="[PAD]", 
+                    bos_token="[BOS]",
+                    eos_token="[EOS]"
+                )
 
     def train_batch_iter(
         self,

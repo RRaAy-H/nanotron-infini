@@ -217,6 +217,7 @@ echo "TensorBoard dir: $TENSORBOARD_DIR"
 echo "Using GPU dataloader: $USE_GPU_DATALOADER"
 echo "Verbose logging: $VERBOSE"
 echo "Flash Attention: ${DISABLE_FLASH_ATTENTION:+disabled}${DISABLE_FLASH_ATTENTION:-enabled}"
+echo "Offline mode: ${OFFLINE_MODE:+enabled}${OFFLINE_MODE:-disabled}"
 echo "-------------------------------------"
 
 # Preprocessing step
@@ -504,6 +505,7 @@ if [[ "$OFFLINE_MODE" = true ]]; then
     export HF_HUB_DISABLE_TELEMETRY=1
     export HF_HUB_DISABLE_SYMLINKS_WARNING=1
     export HF_HUB_DISABLE_IMPLICIT_TOKEN=1
+    export HF_HUB_DISABLE_PROGRESS_BARS=1
     # Set timeouts to minimal values to fail fast
     export HF_HUB_DOWNLOAD_TIMEOUT=1
     # Unset certificate bundles to avoid verification issues
@@ -528,6 +530,7 @@ if [[ "$OFFLINE_MODE" = true ]]; then
     python -c "
 import os
 import sys
+import shutil
 
 # Create a backup file for environment variables
 env_backup_file = '/tmp/env_vars_backup.txt'
@@ -537,6 +540,85 @@ with open(env_backup_file, 'w') as f:
             f.write(f'{key}={value}\\n')
 
 print('Offline mode patch: Environment variables backed up to', env_backup_file)
+
+# Create a patch for the pipeline engine.py file
+engine_patch_file = '/tmp/pipeline_engine_patch.py'
+with open(engine_patch_file, 'w') as f:
+    f.write('''
+# Patch for engine.py to handle offline mode
+import os
+import sys
+import importlib
+from functools import wraps
+
+def patch_engine():
+    try:
+        import nanotron.parallel.pipeline_parallel.engine as engine_module
+        from transformers import AutoTokenizer, PreTrainedTokenizer
+        
+        # Store original __init__ method
+        original_init = engine_module.PipelineEngine.__init__
+        
+        # Create patched __init__ method
+        @wraps(original_init)
+        def patched_init(self):
+            # Call original init first
+            original_init(self)
+            
+            # Check if we're in offline mode
+            offline_mode = bool(os.environ.get('HF_HUB_OFFLINE', False))
+            
+            # Replace the tokenizer initialization with offline-friendly version
+            if hasattr(self, 'tokenizer'):
+                del self.tokenizer
+                
+            try:
+                if offline_mode:
+                    print('PipelineEngine: Using offline mode for tokenizer initialization')
+                    try:
+                        # Try local-only Llama tokenizer
+                        self.tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-2-7b-hf', local_files_only=True)
+                    except:
+                        try:
+                            # Try local-only GPT2 tokenizer
+                            self.tokenizer = AutoTokenizer.from_pretrained('gpt2', local_files_only=True)
+                        except:
+                            # Create a basic tokenizer as last resort
+                            print('PipelineEngine: Creating basic tokenizer in offline mode')
+                            self.tokenizer = PreTrainedTokenizer(
+                                unk_token='[UNK]',
+                                pad_token='[PAD]', 
+                                bos_token='[BOS]',
+                                eos_token='[EOS]'
+                            )
+                else:
+                    # Normal mode - but with better error handling
+                    try:
+                        self.tokenizer = AutoTokenizer.from_pretrained('meta-llama/Llama-2-7b-hf')
+                    except:
+                        self.tokenizer = AutoTokenizer.from_pretrained('gpt2')
+            except Exception as e:
+                print(f'WARNING: Could not initialize tokenizer: {e}')
+                # Create a minimal fallback tokenizer
+                self.tokenizer = PreTrainedTokenizer(
+                    unk_token='[UNK]',
+                    pad_token='[PAD]', 
+                    bos_token='[BOS]',
+                    eos_token='[EOS]'
+                )
+        
+        # Apply the patch
+        engine_module.PipelineEngine.__init__ = patched_init
+        print('Pipeline engine patched for offline mode')
+        
+    except Exception as e:
+        print(f'WARNING: Failed to patch pipeline engine for offline mode: {e}')
+
+# Execute the patch function when this module is imported
+patch_engine()
+''')
+
+print('Offline mode patch: Created pipeline engine patch at', engine_patch_file)
 
 # Create the monkey patching script for transformers
 patch_script = '''
@@ -637,6 +719,17 @@ try:
     print(f"Offline mode: Successfully loaded patch from {patch_path}")
 except Exception as e:
     print(f"Offline mode: Warning - Failed to load patch from {patch_path}: {e}")
+    
+# Load engine patch
+engine_patch_path = '/tmp/pipeline_engine_patch.py'
+if os.path.exists(engine_patch_path):
+    try:
+        spec = importlib.util.spec_from_file_location("engine_patch", engine_patch_path)
+        engine_patch = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(engine_patch)
+        print(f"Offline mode: Successfully loaded engine patch from {engine_patch_path}")
+    except Exception as e:
+        print(f"Offline mode: Warning - Failed to load engine patch: {e}")
 
 # Get the original script to run
 if len(sys.argv) < 2:
