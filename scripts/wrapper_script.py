@@ -50,6 +50,32 @@ logger.info(f"Python path set to include: {project_root}")
 # Create a simple inline patch for weight_decay=None issue
 logger.info("Applying Adam optimizer patch")
 
+def apply_flash_attn_patch():
+    """
+    Apply a patch to handle Flash Attention GLIBC compatibility issues.
+    """
+    try:
+        # Try to run the Flash Attention fix script
+        flash_patch_script = os.path.join(project_root, "scripts", "fix_flash_attention_glibc.py")
+        if os.path.exists(flash_patch_script):
+            logger.info(f"Applying Flash Attention GLIBC compatibility patch: {flash_patch_script}")
+            # Run the patch script as a separate process
+            import subprocess
+            result = subprocess.run([sys.executable, flash_patch_script], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                logger.info("Flash Attention patch applied successfully")
+                logger.info(result.stdout.strip())
+                return True
+            else:
+                logger.warning(f"Flash Attention patch failed: {result.stderr.strip()}")
+        else:
+            logger.warning(f"Flash Attention patch script not found at {flash_patch_script}")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to apply Flash Attention patch: {e}")
+        return False
+
 def apply_adam_patch():
     """
     Apply a patch to the Adam optimizer to handle None weight_decay values.
@@ -112,7 +138,15 @@ def apply_adam_patch():
         logger.error(f"Failed to apply patch: {e}")
         return False
 
-# Try to apply the patch
+# Apply Flash Attention GLIBC compatibility patch
+logger.info("Applying Flash Attention GLIBC compatibility patch...")
+flash_patch_result = apply_flash_attn_patch()
+if flash_patch_result:
+    logger.info("Successfully applied Flash Attention patch to handle GLIBC errors")
+else:
+    logger.warning("Could not apply Flash Attention patch - training may fail if GLIBC is incompatible")
+
+# Try to apply the Adam optimizer patch
 patch_result = apply_adam_patch()
 
 # Try alternative approaches if the patch script failed
