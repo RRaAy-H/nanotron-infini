@@ -56,7 +56,7 @@ def test_local_dataset_access():
         import glob
         
         # Check if dataset directory exists
-        dataset_path = "data1/dataset/HuggingFaceFW/fineweb/"
+        dataset_path = "/data1/dataset/HuggingFaceFW/fineweb/"
         if not os.path.exists(dataset_path):
             print(f"ERROR: Dataset directory not found: {dataset_path}")
             print(f"Please update the path in fineweb_local_200m_infini_config.yaml")
@@ -92,7 +92,7 @@ def test_dataset_loading():
     try:
         from datasets import load_dataset
         
-        dataset_path = "data1/dataset/HuggingFaceFW/fineweb/"
+        dataset_path = "/data1/dataset/HuggingFaceFW/fineweb/"
         
         # Test loading a small sample
         print("Loading small sample (10 examples)...")
@@ -126,7 +126,7 @@ def test_nanotron_integration():
     try:
         from nanotron.dataloader import get_datasets
         
-        dataset_path = "data1/dataset/HuggingFaceFW/fineweb/"
+        dataset_path = "/data1/dataset/HuggingFaceFW/fineweb/"
         
         print("Testing nanotron's get_datasets function...")
         raw_datasets = get_datasets(
