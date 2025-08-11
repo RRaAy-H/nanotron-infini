@@ -89,6 +89,10 @@ while [[ $# -gt 0 ]]; do
             OFFLINE_MODE=true
             shift
             ;;
+        --disable-flash-attn)
+            DISABLE_FLASH_ATTENTION=true
+            shift
+            ;;
         --help)
             echo "Flexible training workflow for Infini-Llama models"
             echo ""
@@ -108,6 +112,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --force-preprocess        Force preprocessing even if data exists"
             echo "  --verbose                 Enable verbose logging"
             echo "  --offline-mode            Run in offline mode (no downloads from HuggingFace)"
+            echo "  --disable-flash-attn      Disable Flash Attention (use standard attention instead)"
+            echo "                            Use this to avoid GLIBC_2.32 errors or CUDA compatibility issues"
             echo "  --help                    Show this help message and exit"
             exit 0
             ;;
@@ -210,6 +216,7 @@ echo "GPU ID: $GPU_ID"
 echo "TensorBoard dir: $TENSORBOARD_DIR"
 echo "Using GPU dataloader: $USE_GPU_DATALOADER"
 echo "Verbose logging: $VERBOSE"
+echo "Flash Attention: ${DISABLE_FLASH_ATTENTION:+disabled}${DISABLE_FLASH_ATTENTION:-enabled}"
 echo "-------------------------------------"
 
 # Preprocessing step
@@ -382,9 +389,15 @@ except Exception as e:
             echo "Options to fix this:"
             echo "  1. Rebuild Flash Attention from source for your system"
             echo "  2. Continue with Flash Attention disabled (using standard attention instead)"
+            echo ""
+            echo "TIP: You can always run training without Flash Attention by using:"
+            echo "     ./scripts/train_without_flash_attn.sh [your regular arguments]"
         elif [[ "$FLASH_COMPATIBILITY" == *"cuda_version_error:"* ]]; then
             echo "CUDA version compatibility issue detected. Your CUDA version may be incompatible"
             echo "with the installed Flash Attention binary."
+            echo ""
+            echo "TIP: You can always run training without Flash Attention by using:"
+            echo "     ./scripts/train_without_flash_attn.sh [your regular arguments]"
         fi
     fi
 fi
