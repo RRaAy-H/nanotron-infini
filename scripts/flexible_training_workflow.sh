@@ -330,12 +330,13 @@ export CUDA_VISIBLE_DEVICES=$GPU_ID
 # Set up environment variables for proper path resolution
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 
-# Set up training logs directory
-export TRAINING_LOGS_DIR="$PROJECT_ROOT/training_logs"
-mkdir -p "$TRAINING_LOGS_DIR"
-# Ensure write permissions
-chmod -R 755 "$TRAINING_LOGS_DIR"
-echo "Training logs will be saved to: $TRAINING_LOGS_DIR"
+# Set up distributed training environment variables for single GPU mode
+# These are needed by ParallelContext even in non-distributed mode
+export RANK=0
+export WORLD_SIZE=1
+export LOCAL_RANK=0
+export MASTER_ADDR="localhost"
+export MASTER_PORT=29500
 
 # Set up training logs directory
 export TRAINING_LOGS_DIR="$PROJECT_ROOT/training_logs"
@@ -701,26 +702,26 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
         if [[ "$OFFLINE_MODE" = true ]] && [[ -f "/tmp/offline_wrapper.py" ]]; then
             # In offline mode, use the offline wrapper script
             if [[ -f "$WRAP_SCRIPT" ]]; then
-                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$WRAP_SCRIPT\" \
+                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 RANK=0 WORLD_SIZE=1 LOCAL_RANK=0 MASTER_ADDR=localhost MASTER_PORT=29500 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$WRAP_SCRIPT\" \
                     --config-file \"$CONFIG_FILE\" \
                     --data-dir \"$PREPROCESSED_DATA\" \
                     --gpu-id 0 \
                     --tensorboard-dir \"$INFINI_TB_DIR\""
                 
-                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$WRAP_SCRIPT\" \
+                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 RANK=0 WORLD_SIZE=1 LOCAL_RANK=0 MASTER_ADDR=localhost MASTER_PORT=29501 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$WRAP_SCRIPT\" \
                     --config-file \"$CONFIG_FILE\" \
                     --data-dir \"$PREPROCESSED_DATA\" \
                     --gpu-id 0 \
                     --disable-infini-attn \
                     --tensorboard-dir \"$BASELINE_TB_DIR\""
             else
-                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 RANK=0 WORLD_SIZE=1 LOCAL_RANK=0 MASTER_ADDR=localhost MASTER_PORT=29500 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
                     --config-file \"$CONFIG_FILE\" \
                     --data-dir \"$PREPROCESSED_DATA\" \
                     --gpu-id 0 \
                     --tensorboard-dir \"$INFINI_TB_DIR\""
                 
-                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 RANK=0 WORLD_SIZE=1 LOCAL_RANK=0 MASTER_ADDR=localhost MASTER_PORT=29501 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
                     --config-file \"$CONFIG_FILE\" \
                     --data-dir \"$PREPROCESSED_DATA\" \
                     --gpu-id 0 \
@@ -730,13 +731,13 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
         else
             # Normal mode (online)
             if [[ -f "$WRAP_SCRIPT" ]]; then
-                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$WRAP_SCRIPT\" \
+                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 RANK=0 WORLD_SIZE=1 LOCAL_RANK=0 MASTER_ADDR=localhost MASTER_PORT=29500 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$WRAP_SCRIPT\" \
                     --config-file \"$CONFIG_FILE\" \
                     --data-dir \"$PREPROCESSED_DATA\" \
                     --gpu-id 0 \
                     --tensorboard-dir \"$INFINI_TB_DIR\""
                 
-                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$WRAP_SCRIPT\" \
+                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 RANK=0 WORLD_SIZE=1 LOCAL_RANK=0 MASTER_ADDR=localhost MASTER_PORT=29501 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$WRAP_SCRIPT\" \
                     --config-file \"$CONFIG_FILE\" \
                     --data-dir \"$PREPROCESSED_DATA\" \
                     --gpu-id 0 \
@@ -745,13 +746,13 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
             else
                 # Fallback to direct execution if wrapper script doesn't exist
                 echo "WARNING: Wrapper script not found, falling back to direct execution for parallel training"
-                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 RANK=0 WORLD_SIZE=1 LOCAL_RANK=0 MASTER_ADDR=localhost MASTER_PORT=29500 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
                     --config-file \"$CONFIG_FILE\" \
                     --data-dir \"$PREPROCESSED_DATA\" \
                     --gpu-id 0 \
                     --tensorboard-dir \"$INFINI_TB_DIR\""
                 
-                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 RANK=0 WORLD_SIZE=1 LOCAL_RANK=0 MASTER_ADDR=localhost MASTER_PORT=29501 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
                     --config-file \"$CONFIG_FILE\" \
                     --data-dir \"$PREPROCESSED_DATA\" \
                     --gpu-id 0 \
