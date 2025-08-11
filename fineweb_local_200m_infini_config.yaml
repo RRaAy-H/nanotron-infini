@@ -127,11 +127,8 @@ logging:
 # Profiler (disabled for simplicity)
 profiler: null
 
-# Optional: Experiment logging (comment out if not using)
-# experiment_logger:
-#   tensorboard_logger:
-#     flush_secs: 30
-#     tensorboard_dir: ./tb_logs
-#   wandb_logger:
-#     wandb_entity: null
-#     wandb_project: llama_200m_infini_local_fineweb
+# Experiment logging
+experiment_logger:
+  tensorboard_logger:
+    flush_secs: 30
+    tensorboard_dir: ./tb_logs
