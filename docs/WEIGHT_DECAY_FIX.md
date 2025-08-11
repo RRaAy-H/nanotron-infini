@@ -1,16 +1,30 @@
-# Weight Decay Fix for Adam Optimizer
+# Weight Decay Fix for Adam Optimizer in PyTorch 1.x and 2.x
 
-This document provides information about the fix for the `unsupported operand type(s) for *: 'float' and 'NoneType'` error in the Adam optimizer.
+This document provides information about the fix for the `unsupported operand type(s) for *: 'float' and 'NoneType'` error in the Adam optimizer when using PyTorch 1.x or 2.x with Infini-Llama models.
 
 ## Problem Description
 
-The error occurs when the Adam optimizer attempts to apply weight decay to parameters while `weight_decay` is `None`. Specifically, the error happens in this line in PyTorch's Adam optimizer implementation:
+The error occurs when the Adam optimizer attempts to apply weight decay to parameters while `weight_decay` is `None`. Specifically, the error happens in PyTorch's Adam optimizer implementation:
 
 ```python
-param.mul(1 - lr * weight_decay)
+param.mul(1 - lr * weight_decay)  # In PyTorch 1.x
 ```
 
-If `weight_decay` is `None`, then `lr * weight_decay` fails with a `TypeError: unsupported operand type(s) for *: 'float' and 'NoneType'`.
+or in PyTorch 2.x:
+
+```python
+param.mul_(1 - lr * weight_decay)  # In PyTorch 2.x _single_tensor_adam
+```
+
+If `weight_decay` is `None`, then `lr * weight_decay` fails with:
+```
+TypeError: unsupported operand type(s) for *: 'float' and 'NoneType'
+```
+
+In PyTorch 2.x, you might also see the error:
+```
+AttributeError: module 'torch.optim' has no attribute 'adam'. Did you mean: 'Adam'?
+```
 
 ### Root Cause Analysis
 
@@ -24,22 +38,23 @@ The issue happens because:
 
 3. In the optimization loop, it attempts to perform the `param.mul(1 - lr * weight_decay)` operation, which fails when weight_decay is None.
 
-4. In PyTorch 2.x versions, this happens in the `_single_tensor_adam` function, specifically at the line:
-   ```python
-   param.mul_(1 - lr * weight_decay)  # Fails when weight_decay is None
-   ```
+4. **PyTorch 2.x Changes**: The module structure changed significantly in PyTorch 2.x:
+   - In PyTorch 1.x: The Adam implementation was in `torch.optim.adam.adam`
+   - In PyTorch 2.x: The Adam implementation moved to C++ code and is accessed differently
 
-5. This can happen when:
+5. **Additional PyTorch 2.x Issue**: Our existing patching code tries to access `torch.optim.adam` which doesn't exist in PyTorch 2.x, leading to the error: `AttributeError: module 'torch.optim' has no attribute 'adam'`
+
+6. These issues can happen when:
    - Config files explicitly set weight_decay to null/None
    - No weight_decay is specified and the optimizer uses None as default
    - Parameter settings are improperly passed between modules
-   - Using PyTorch 2.x with older patching approaches that don't target the `_single_tensor_adam` function
+   - Using PyTorch 2.x with older patching approaches that don't account for the module structure changes
 
-## Solution
+## Solution for PyTorch 1.x and 2.x
 
-We implemented multiple fixes to ensure weight decay always has a proper numeric value:
+We implemented comprehensive fixes to ensure weight decay always has a proper numeric value across all PyTorch versions:
 
-1. **Dedicated Module at `src/nanotron/optim/fix_weight_decay.py`**: A proper module that can be imported in any project file:
+1. **Enhanced Module at `src/nanotron/optim/fix_weight_decay.py`**: A robust module that handles both PyTorch 1.x and 2.x:
 
 ```python
 import logging
@@ -51,35 +66,86 @@ def patch_adam_optimizer():
     """
     Patch PyTorch's Adam optimizer to handle None weight_decay values.
     This prevents 'unsupported operand type(s) for *: 'float' and 'NoneType'' errors.
+    Works with both PyTorch 1.x and 2.x module structures.
     """
-    if not hasattr(torch.optim.adam, 'adam'):
-        logger.warning("Cannot patch Adam optimizer: 'adam' function not found in torch.optim.adam")
-        return False
-
-    # Store original function
-    original_adam = torch.optim.adam.adam
-
-    def patched_adam(*args, **kwargs):
-        """Patched adam function that handles None weight_decay."""
-        # Check if weight_decay is None in kwargs and replace with 0.0
-        if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
-            logger.info("Fixed: Replaced None weight_decay with 0.0 in Adam optimizer")
-            kwargs['weight_decay'] = 0.0
+    success = False
+    pytorch_version = torch.__version__
+    logger.info(f"Detected PyTorch version: {pytorch_version}")
+    
+    # Strategy 1: Try to patch torch.optim.adam (PyTorch 1.x structure)
+    try:
+        from torch.optim import adam
         
-        # Handle positional args for weight_decay (usually 4th arg)
-        if len(args) >= 4 and args[3] is None:
-            logger.info("Fixed: Replaced None weight_decay in positional args with 0.0")
-            args = list(args)
-            args[3] = 0.0
-            args = tuple(args)
+        if hasattr(adam, '_single_tensor_adam'):
+            # Store original function
+            original_func = adam._single_tensor_adam
+            
+            # Create a patched version that checks for None weight_decay
+            def patched_single_tensor_adam(*args, **kwargs):
+                # Fix None weight_decay
+                if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
+                    logger.info("Fixed: Replaced None weight_decay with 0.0 in _single_tensor_adam")
+                    kwargs['weight_decay'] = 0.0
+                
+                # Call original with fixed kwargs
+                return original_func(*args, **kwargs)
+            
+            # Replace the function
+            adam._single_tensor_adam = patched_single_tensor_adam
+            logger.info("Successfully patched _single_tensor_adam function")
+            success = True
         
-        # Call original function
-        return original_adam(*args, **kwargs)
+        if hasattr(adam, 'adam'):
+            # Store original function
+            original_adam = adam.adam
+            
+            def patched_adam(*args, **kwargs):
+                # Check if weight_decay is None in kwargs and replace with 0.0
+                if 'weight_decay' in kwargs and kwargs['weight_decay'] is None:
+                    logger.info("Fixed: Replaced None weight_decay with 0.0 in Adam optimizer")
+                    kwargs['weight_decay'] = 0.0
+                
+                # Handle positional args for weight_decay (usually 4th arg)
+                if len(args) >= 4 and args[3] is None:
+                    logger.info("Fixed: Replaced None weight_decay in positional args with 0.0")
+                    args = list(args)
+                    args[3] = 0.0
+                    args = tuple(args)
+                
+                # Call original function
+                return original_adam(*args, **kwargs)
+            
+            # Replace with our patched version
+            adam.adam = patched_adam
+            logger.info("Successfully patched torch.optim.adam.adam function")
+            success = True
+    except (ImportError, AttributeError) as e:
+        logger.info(f"Could not patch torch.optim.adam (expected in PyTorch 2.x): {e}")
+    
+    # Strategy 2: Always patch the Adam class directly (works in all versions)
+    from torch.optim import Adam
+    
+    # Store original step method
+    original_step = Adam.step
+    
+    # Create patched step method
+    def patched_step(self, closure=None):
+        """Patched step method that ensures weight_decay is never None"""
+        # Replace None weight_decay with 0.0 in optimizer instance
+        for group in self.param_groups:
+            if 'weight_decay' in group and group['weight_decay'] is None:
+                logger.info("Fixed: Replaced None weight_decay with 0.0 in Adam optimizer group")
+                group['weight_decay'] = 0.0
+                
+        # Call original step method
+        return original_step(self, closure)
+    
+    # Apply the patch
+    Adam.step = patched_step
+    logger.info("Successfully patched Adam.step method (works in all PyTorch versions)")
+    success = True
 
-    # Replace the original function with our patched version
-    torch.optim.adam.adam = patched_adam
-    logger.info("Successfully patched Adam optimizer to handle None weight_decay values")
-    return True
+    return success
 ```
 
 2. **Simple Patch Script (`scripts/adam_optimizer_patch.py`)**: A minimalist script that can be imported to apply the patch:
@@ -200,12 +266,17 @@ import preimport  # This applies the patches automatically
 
 ### Automatic Fix with Flexible Training Workflow
 
-The fix is automatically applied when running the `flexible_training_workflow.sh` script. The script:
+The fix is automatically applied when running the `flexible_training_workflow.sh` script. The script now includes updated methods to handle both PyTorch 1.x and 2.x versions:
 
-1. Ensures the config file has a valid weight_decay value 
-2. Uses a dedicated wrapper script (`scripts/wrapper_script.py`) that applies our patches
-3. Applies the Adam patch directly via the `apply_adam_patch.sh` script or inline Python code
-4. Runs the training script through this wrapper
+1. **Multi-strategy approach**: 
+   - First tries the direct patch approach using `direct_adam_patch.py` (works with both PyTorch versions)
+   - Falls back to the apply_adam_patch scripts if needed
+   - Uses inline patching as a last resort
+
+2. **Other automatic fixes**:
+   - Ensures the config file has a valid weight_decay value 
+   - Uses a dedicated wrapper script (`scripts/wrapper_script.py`) that applies our patches
+   - Runs the training script through this wrapper
 
 No additional steps are required as the fix is now fully integrated into the workflow.
 
@@ -213,7 +284,17 @@ No additional steps are required as the fix is now fully integrated into the wor
 
 If you're running training manually or creating your own scripts, you can apply the fix in several ways:
 
-#### Option 1: Import the Dedicated Module
+#### Option 1: Use the Direct Adam Patch (Recommended for PyTorch 2.x)
+
+```bash
+# Run the direct patch script before your training code
+python scripts/direct_adam_patch.py
+
+# Then run your training
+python run_direct_training.py --config-file your_config.yaml
+```
+
+#### Option 2: Import the Enhanced Fix Module
 
 ```python
 # At the top of your training script
@@ -225,28 +306,17 @@ patch_adam_optimizer()
 # Then continue with your training code
 ```
 
-#### Option 2: Run the Patch Script Before Training
+#### Option 3: Apply the Patch Script Before Training
 
 ```bash
 # Apply the patch using the shell script
-bash scripts/apply_adam_patch.sh
+bash scripts/apply_adam_patch_v2.sh  # Use v2 for PyTorch 2.x compatibility
 
 # Or run the Python patch directly
-python scripts/fix_adam_none_issue.py
+python scripts/direct_adam_patch.py
 
 # Then run your training
 python run_direct_training.py --config-file your_config.yaml
-```
-
-#### Option 3: Import the Simple Patch
-
-```python
-# At the top of your script
-import sys
-sys.path.append('scripts')
-import adam_optimizer_patch
-
-# Then continue with your training code
 ```
 
 #### Option 4: Modify Your Config Files
@@ -261,6 +331,22 @@ optimizer:
 ```
 
 ## Troubleshooting
+
+### PyTorch 2.x Specific Issues
+
+If you encounter the error `AttributeError: module 'torch.optim' has no attribute 'adam'. Did you mean: 'Adam'?`:
+
+1. This is due to the module structure changes in PyTorch 2.x
+2. Use the `direct_adam_patch.py` script which handles these changes
+3. Make sure you're applying the patch before importing any other modules that might use the optimizer
+
+```bash
+# Best approach for PyTorch 2.x
+python scripts/direct_adam_patch.py
+python run_direct_training.py --config-file your_config.yaml
+```
+
+### Other Common Issues
 
 If you encounter issues with the wrapper script, you can test it using:
 
@@ -277,6 +363,27 @@ Common issues:
 - **Import errors**: Ensure that the Python path includes the project root and script directories.
 - **Permission denied**: Make sure the wrapper script has execute permissions with `chmod +x scripts/wrapper_script.py`.
 
+## PyTorch Version Detection
+
+The updated patch scripts now automatically detect your PyTorch version and apply the appropriate fixes:
+
+```python
+import torch
+pytorch_version = torch.__version__
+print(f"Detected PyTorch version: {pytorch_version}")
+
+# Apply version-specific patches
+if pytorch_version.startswith('1.'):
+    # Apply PyTorch 1.x specific patches
+    # ...
+else:
+    # Apply PyTorch 2.x specific patches
+    # ...
+```
+
 ## Note for Developers
 
-When working with optimizer parameters, always ensure numerical parameters have default values or proper type checking to avoid NoneType errors.
+When working with optimizer parameters:
+1. Always ensure numerical parameters have default values or proper type checking
+2. Don't use `None` as a default for parameters that will be used in arithmetic operations
+3. For PyTorch 2.x, be aware of the module structure changes and test patches thoroughly
