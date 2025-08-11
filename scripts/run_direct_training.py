@@ -28,6 +28,7 @@ parser.add_argument("--tensorboard-dir", type=str, default=None, help="Directory
 parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 parser.add_argument("--use-gpu-dataloader", action="store_true", help="Use GPU-accelerated dataloader")
 parser.add_argument("--offline-mode", action="store_true", help="Run in offline mode (no downloads from HuggingFace)")
+parser.add_argument("--disable-flash-attn", action="store_true", help="Disable Flash Attention (for compatibility issues)")
 args = parser.parse_args()
 
 # Configure the environment
@@ -50,6 +51,28 @@ if args.offline_mode:
     os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
     os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
     os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
+    
+# Configure Flash Attention disabling if requested
+if args.disable_flash_attn or os.environ.get("DISABLE_FLASH_ATTN") == "1":
+    print("Flash Attention is disabled - will use standard attention implementation")
+    
+    # Set environment variable for consistent behavior
+    os.environ["DISABLE_FLASH_ATTN"] = "1"
+    
+    # Monkey patch to prevent flash attention import attempts
+    import sys
+    class FlashAttentionBlocker:
+        def find_spec(self, fullname, path, target=None):
+            if fullname.startswith('flash_attn'):
+                # Print warning only once
+                if not hasattr(sys, "_flash_attn_warning_shown"):
+                    print(f"Import of {fullname} was blocked because Flash Attention is disabled")
+                    sys._flash_attn_warning_shown = True
+                raise ImportError(f"Flash Attention disabled: {fullname} import blocked")
+            return None
+    
+    # Add our import blocker to sys.meta_path
+    sys.meta_path.insert(0, FlashAttentionBlocker())
     # Set timeouts to minimal values to fail fast
     os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "1"
     os.environ["REQUESTS_CA_BUNDLE"] = ""

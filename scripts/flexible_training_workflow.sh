@@ -324,19 +324,62 @@ if [[ "$OFFLINE_MODE" = true ]]; then
     TRAIN_CMD="$TRAIN_CMD --offline-mode"
 fi
 
+# Add Flash Attention disabled flag if needed
+if [[ "$DISABLE_FLASH_ATTENTION" = true ]]; then
+    TRAIN_CMD="$TRAIN_CMD --disable-flash-attn"
+fi
+
 # Set CUDA_VISIBLE_DEVICES
 export CUDA_VISIBLE_DEVICES=$GPU_ID
 
 # Set up environment variables for proper path resolution
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 
-# Check if Flash Attention is available, and disable it if not
+# Check if Flash Attention is available and compatible, disable it if issues are detected
 DISABLE_FLASH_ATTENTION=false
+FLASH_ATTN_ERROR=""
+
+# First check if flash_attn can be imported
 if ! python -c "import flash_attn" &>/dev/null; then
     echo "Flash Attention is not installed. Automatically disabling it."
     DISABLE_FLASH_ATTENTION=true
-    # Set environment variable to disable Flash Attention
+    FLASH_ATTN_ERROR="Not installed"
+else
+    # Try to import and verify compatibility
+    FLASH_COMPATIBILITY=$(python -c "
+import sys
+try:
+    import flash_attn
+    try:
+        # Try to import the CUDA module which often has compatibility issues
+        import flash_attn_2_cuda
+        print('compatible')
+    except ImportError as e:
+        # Check for common compatibility errors
+        error_msg = str(e)
+        if 'GLIBC' in error_msg:
+            print('glibc_version')
+        elif 'CUDA' in error_msg:
+            print('cuda_version')
+        else:
+            print('import_error: ' + error_msg)
+except Exception as e:
+    print('error: ' + str(e))
+" 2>/dev/null)
+
+    if [[ "$FLASH_COMPATIBILITY" != "compatible" ]]; then
+        echo "Flash Attention compatibility issue detected: $FLASH_COMPATIBILITY"
+        echo "Automatically disabling Flash Attention."
+        DISABLE_FLASH_ATTENTION=true
+        FLASH_ATTN_ERROR="$FLASH_COMPATIBILITY"
+    fi
+fi
+
+# Set environment variable to disable Flash Attention if needed
+if [[ "$DISABLE_FLASH_ATTENTION" = true ]]; then
     export DISABLE_FLASH_ATTN=1
+    echo "Flash Attention disabled due to: $FLASH_ATTN_ERROR"
+    echo "Adding --flash-attn-disabled flag to training command"
 fi
 
 # Set up distributed training environment variables for single GPU mode
