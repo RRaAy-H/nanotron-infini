@@ -56,8 +56,10 @@ if args.offline_mode:
 if args.disable_flash_attn or os.environ.get("DISABLE_FLASH_ATTN") == "1":
     print("Flash Attention is disabled - will use standard attention implementation")
     
-    # Set environment variable for consistent behavior
+    # Set environment variable for consistent behavior across all modules
     os.environ["DISABLE_FLASH_ATTN"] = "1"
+    # Also set this environment variable for transformers library compatibility
+    os.environ["USE_FLASH_ATTENTION"] = "0"
     
     # Monkey patch to prevent flash attention import attempts
     import sys
@@ -73,6 +75,16 @@ if args.disable_flash_attn or os.environ.get("DISABLE_FLASH_ATTN") == "1":
     
     # Add our import blocker to sys.meta_path
     sys.meta_path.insert(0, FlashAttentionBlocker())
+    
+    # Try to prevent flash_attn imports in modules that might use it
+    try:
+        import transformers.models.llama.modeling_llama
+        # Monkey patch transformers to avoid flash attention usage
+        if hasattr(transformers.models.llama.modeling_llama, "_is_flash_attn_available"):
+            transformers.models.llama.modeling_llama._is_flash_attn_available = lambda: False
+            print("Successfully patched transformers to avoid Flash Attention usage")
+    except (ImportError, AttributeError):
+        pass
     # Set timeouts to minimal values to fail fast
     os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "1"
     os.environ["REQUESTS_CA_BUNDLE"] = ""

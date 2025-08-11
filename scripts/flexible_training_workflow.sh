@@ -350,6 +350,7 @@ else
 import sys
 try:
     import flash_attn
+    print('Flash Attention version:', flash_attn.__version__)
     try:
         # Try to import the CUDA module which often has compatibility issues
         import flash_attn_2_cuda
@@ -357,21 +358,34 @@ try:
     except ImportError as e:
         # Check for common compatibility errors
         error_msg = str(e)
-        if 'GLIBC' in error_msg:
-            print('glibc_version')
+        if 'GLIBC_2.32' in error_msg or 'GLIBC_2.3' in error_msg or 'GLIBC' in error_msg:
+            print('glibc_version_error: ' + error_msg)
         elif 'CUDA' in error_msg:
-            print('cuda_version')
+            print('cuda_version_error: ' + error_msg)
         else:
             print('import_error: ' + error_msg)
 except Exception as e:
     print('error: ' + str(e))
 " 2>/dev/null)
 
-    if [[ "$FLASH_COMPATIBILITY" != "compatible" ]]; then
-        echo "Flash Attention compatibility issue detected: $FLASH_COMPATIBILITY"
+    if [[ "$FLASH_COMPATIBILITY" != *"compatible"* ]]; then
+        echo "Flash Attention compatibility issue detected:"
+        echo "$FLASH_COMPATIBILITY"
         echo "Automatically disabling Flash Attention."
         DISABLE_FLASH_ATTENTION=true
         FLASH_ATTN_ERROR="$FLASH_COMPATIBILITY"
+        
+        # Extract detailed error message for diagnostics
+        if [[ "$FLASH_COMPATIBILITY" == *"glibc_version_error:"* ]]; then
+            echo "GLIBC version compatibility issue detected. This happens when Flash Attention"
+            echo "was compiled with a newer GLIBC version than what's available on your system."
+            echo "Options to fix this:"
+            echo "  1. Rebuild Flash Attention from source for your system"
+            echo "  2. Continue with Flash Attention disabled (using standard attention instead)"
+        elif [[ "$FLASH_COMPATIBILITY" == *"cuda_version_error:"* ]]; then
+            echo "CUDA version compatibility issue detected. Your CUDA version may be incompatible"
+            echo "with the installed Flash Attention binary."
+        fi
     fi
 fi
 
@@ -379,7 +393,13 @@ fi
 if [[ "$DISABLE_FLASH_ATTENTION" = true ]]; then
     export DISABLE_FLASH_ATTN=1
     echo "Flash Attention disabled due to: $FLASH_ATTN_ERROR"
-    echo "Adding --flash-attn-disabled flag to training command"
+    echo "Adding --disable-flash-attn flag to training command"
+    
+    # Add the flag to the training command
+    TRAIN_CMD="$TRAIN_CMD --disable-flash-attn"
+    
+    # Log the action for diagnostic purposes
+    echo "[$(date +"%Y-%m-%d %H:%M:%S")] Flash Attention disabled due to compatibility issue: $FLASH_ATTN_ERROR" >> "$PROJECT_ROOT/flash_attention_log.txt"
 fi
 
 # Set up distributed training environment variables for single GPU mode

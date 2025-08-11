@@ -8,6 +8,8 @@ After thorough analysis of the Infini-Llama codebase, we have successfully:
 2. Created missing scripts that were referenced but not found
 3. Enhanced the documentation with detailed usage instructions
 4. Added utilities for maintenance and verification
+5. Fixed Flash Attention compatibility issues (GLIBC_2.32 not found error)
+6. Added robust detection and automatic handling of compatibility issues
 
 The flexible training workflow is now fully functional with all components properly integrated and documented.
 
@@ -19,6 +21,8 @@ The flexible training workflow is now fully functional with all components prope
 |--------|---------|--------|
 | `scripts/flexible_training_workflow.sh` | Main entry point for workflow | ✅ Present |
 | `scripts/wrapper_script.py` | Environment setup and patch application | ✅ Present |
+| `scripts/utils/verify_flash_attention.py` | Flash Attention compatibility diagnostics | ✅ Added |
+| `scripts/utils/install_flash_attention_from_source.sh` | Rebuild Flash Attention from source | ✅ Added |
 | `scripts/run_direct_training.py` | Main training execution | ✅ Present |
 | `scripts/training/train_infini_llama.py` | Training implementation | ✅ Present |
 | `scripts/preprocessing/preprocess_data_fixed.py` | Data preprocessing | ✅ Present |

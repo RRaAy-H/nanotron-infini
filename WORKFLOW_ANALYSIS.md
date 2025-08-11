@@ -19,6 +19,12 @@ This document analyzes the Infini-Llama training workflow to identify essential 
 
 3. **Optimizer Patches**
    - `scripts/direct_adam_patch.py`: Fixes the Adam optimizer weight_decay=None issue
+   
+4. **Flash Attention Compatibility**
+   - `scripts/utils/verify_flash_attention.py`: Diagnostics tool for Flash Attention compatibility
+   - `scripts/utils/install_flash_attention_from_source.sh`: Script to rebuild Flash Attention from source
+   - Enhanced Flash Attention compatibility detection in `flexible_training_workflow.sh`
+   - Automatic disabling of Flash Attention when compatibility issues are detected
 
 4. **Configuration**
    - `scripts/config/tiny_test_config.yaml`: Default minimal configuration for testing
