@@ -113,7 +113,7 @@ try:
         print("GPU dataloader not available, falling back to CPU processing.")
     
     from nanotron import logging
-    from nanotron.models.llama import LlamaForCausalLM
+    from nanotron.models.llama import LlamaForTraining
     from nanotron.optim import (
         get_optimizer,
         get_lr_scheduler,
