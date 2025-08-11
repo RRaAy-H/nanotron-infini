@@ -23,6 +23,7 @@ cd "$PROJECT_ROOT"
 # Default values
 RAW_DATA=""
 PREPROCESSED_DATA=""
+PARQUET_DATA=""  # Added for parquet files
 CONFIG_FILE="scripts/config/tiny_test_config.yaml"
 OUTPUT_DIR="preprocessed_data"
 DISABLE_INFINI_ATTN=false
@@ -33,6 +34,8 @@ FORCE_PREPROCESS=false
 DISABLE_FUSED_ADAM=true  # Set to true to avoid fused Adam optimizer errors
 VERBOSE=false
 OFFLINE_MODE=false  # Set to true to disable Hugging Face downloads
+MAX_SEQ_LENGTH=2048  # Default sequence length for tokenization
+TOKENIZER="meta-llama/Llama-2-7b-hf"  # Default tokenizer
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -41,12 +44,24 @@ while [[ $# -gt 0 ]]; do
             RAW_DATA="$2"
             shift 2
             ;;
+        --parquet-data)
+            PARQUET_DATA="$2"
+            shift 2
+            ;;
         --preprocessed-data)
             PREPROCESSED_DATA="$2"
             shift 2
             ;;
         --config-file)
             CONFIG_FILE="$2"
+            shift 2
+            ;;
+        --tokenizer)
+            TOKENIZER="$2"
+            shift 2
+            ;;
+        --max-seq-length)
+            MAX_SEQ_LENGTH="$2"
             shift 2
             ;;
         --output-dir)
@@ -180,9 +195,9 @@ else
     chmod +x "$WRAP_SCRIPT"  # Ensure it's executable
 fi
 
-# Check if we have either raw data or preprocessed data
-if [[ -z "$RAW_DATA" ]] && [[ -z "$PREPROCESSED_DATA" ]]; then
-    echo "Error: Either --raw-data or --preprocessed-data must be specified."
+# Check if we have either raw data or preprocessed data or parquet data
+if [[ -z "$RAW_DATA" ]] && [[ -z "$PREPROCESSED_DATA" ]] && [[ -z "$PARQUET_DATA" ]]; then
+    echo "Error: Either --raw-data, --preprocessed-data, or --parquet-data must be specified."
     echo "Use --help for usage information."
     exit 1
 fi
