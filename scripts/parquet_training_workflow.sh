@@ -76,6 +76,8 @@ while [[ $# -gt 0 ]]; do
             echo "  --no-gpu-dataloader       Disable GPU-accelerated dataloader"
             echo "  --verbose                 Enable verbose logging"
             echo "  --help                    Show this help message and exit"
+            echo ""
+            echo "NOTE: Flash Attention compatibility is automatically detected and handled by default."
             exit 0
             ;;
         *)

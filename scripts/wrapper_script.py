@@ -201,8 +201,23 @@ if __name__ == "__main__":
             logger.error("-----------------------------------------------------------")
             sys.exit(1)
     
+        # Add auto-detect-flash-attn flag to args if not explicitly disabled
+    args_to_pass = sys.argv[1:]
+    
+    # Check if flash attention detection is explicitly set in the arguments
+    has_flash_attn_flag = False
+    for arg in args_to_pass:
+        if arg == "--disable-flash-attn" or arg == "--auto-detect-flash-attn":
+            has_flash_attn_flag = True
+            break
+    
+    # If no explicit Flash Attention flag is set, add auto-detect flag
+    if not has_flash_attn_flag:
+        logger.info("Adding --auto-detect-flash-attn flag to automatically handle Flash Attention compatibility")
+        args_to_pass.append("--auto-detect-flash-attn")
+    
     logger.info(f"Running training script: {script_path}")
-    logger.info(f"With arguments: {sys.argv[1:]}")
+    logger.info(f"With arguments: {args_to_pass}")
     
     # Use execv to replace the current process with the training script
-    os.execv(sys.executable, [sys.executable, script_path] + sys.argv[1:])
+    os.execv(sys.executable, [sys.executable, script_path] + args_to_pass)

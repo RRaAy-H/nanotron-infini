@@ -350,6 +350,9 @@ fi
 # Add Flash Attention disabled flag if needed
 if [[ "$DISABLE_FLASH_ATTENTION" = true ]]; then
     TRAIN_CMD="$TRAIN_CMD --disable-flash-attn"
+else
+    # Add auto-detect flag when not explicitly disabled
+    TRAIN_CMD="$TRAIN_CMD --auto-detect-flash-attn"
 fi
 
 # Set CUDA_VISIBLE_DEVICES

@@ -16,26 +16,42 @@ Flash Attention is a more efficient attention implementation that significantly 
 
 The training workflow has been enhanced to automatically detect Flash Attention compatibility issues:
 
-1. When you run `flexible_training_workflow.sh`, it automatically checks if Flash Attention is:
-   - Installed
-   - Compatible with your system
-   - Able to load its CUDA modules
+1. When you run any training workflow script (including `flexible_training_workflow.sh` and `parquet_training_workflow.sh`), it automatically:
+   - Uses our new `flash_attention_compatibility.py` script to check system compatibility
+   - Detects your system's GLIBC version and compares it with Flash Attention requirements
+   - Checks if Flash Attention is installed and can be properly imported
+   - Tests if Flash Attention CUDA modules can be loaded
 
 2. If any compatibility issues are detected, the workflow:
-   - Automatically disables Flash Attention
+   - Automatically disables Flash Attention with no manual intervention needed
    - Sets appropriate environment variables
-   - Adds the `--disable-flash-attn` flag to the training command
-   - Applies monkey patches to block Flash Attention imports
+   - Creates mock modules to ensure imports don't fail
+   - Falls back to standard attention implementation
+   - Continues training without interruption
 
 ## Solutions for Flash Attention Issues
 
-### Option 1: Train without Flash Attention (Automatic)
+### Option 1: Automatic Detection and Handling (Recommended)
 
-The workflow will automatically disable Flash Attention if it detects compatibility issues. You don't need to do anything special - it will fall back to standard attention.
+Our workflow now features intelligent auto-detection of Flash Attention compatibility issues:
+
+- All training scripts now include the `--auto-detect-flash-attn` flag by default
+- The system automatically checks if your GLIBC version is compatible (requires 2.32+)
+- If incompatible, Flash Attention is automatically disabled and training continues with standard attention
+- No manual intervention is needed - just run your training script as normal
+
+For example:
+```bash
+# With parquet data:
+./scripts/parquet_training_workflow.sh --parquet-data /path/to/parquet/files --config-file custom_infini_config_gpu.yaml
+
+# With standard data:
+./scripts/flexible_training_workflow.sh --config-file scripts/config/tiny_test_config.yaml --preprocessed-data tiny_test_data/preprocessed_20240808_123456
+```
 
 ### Option 2: Manually Disable Flash Attention
 
-You can manually disable Flash Attention by adding the `--disable-flash-attn` flag:
+If you explicitly want to disable Flash Attention regardless of compatibility:
 
 ```bash
 ./scripts/flexible_training_workflow.sh --config-file scripts/config/tiny_test_config.yaml --preprocessed-data tiny_test_data/preprocessed_20240808_123456 --disable-flash-attn

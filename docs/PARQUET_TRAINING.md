@@ -66,6 +66,16 @@ Column: content
 Values: ["This is a text example for training...", "Here is another example...", ...]
 ```
 
+## Flash Attention Compatibility
+
+The parquet training workflow now includes automatic detection and handling of Flash Attention compatibility issues. If you're experiencing the GLIBC_2.32 error or other Flash Attention compatibility issues, the workflow will:
+
+1. Automatically detect the incompatibility
+2. Disable Flash Attention
+3. Continue training with standard attention implementation
+
+You don't need to do anything special - this happens automatically when you run the `parquet_training_workflow.sh` script.
+
 ## Troubleshooting
 
 If you encounter issues:
@@ -74,3 +84,5 @@ If you encounter issues:
 2. Check that the parquet files contain text data in a recognizable column
 3. Ensure your GPU has enough memory for the configuration specified in your config file
 4. Try reducing the batch size or sequence length in your config file if you experience out-of-memory errors
+5. If you have Flash Attention errors, check the logs to see if the auto-detection system handled it properly
+6. For detailed information about Flash Attention compatibility, see `docs/FLASH_ATTENTION_TROUBLESHOOTING.md`

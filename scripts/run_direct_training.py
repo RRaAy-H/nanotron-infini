@@ -29,6 +29,7 @@ parser.add_argument("--verbose", action="store_true", help="Enable verbose loggi
 parser.add_argument("--use-gpu-dataloader", action="store_true", help="Use GPU-accelerated dataloader")
 parser.add_argument("--offline-mode", action="store_true", help="Run in offline mode (no downloads from HuggingFace)")
 parser.add_argument("--disable-flash-attn", action="store_true", help="Disable Flash Attention (for compatibility issues)")
+parser.add_argument("--auto-detect-flash-attn", action="store_true", help="Automatically detect and handle Flash Attention compatibility")
 args = parser.parse_args()
 
 # Configure the environment
@@ -52,8 +53,48 @@ if args.offline_mode:
     os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
     os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
     
-# Configure Flash Attention disabling if requested
-if args.disable_flash_attn or os.environ.get("DISABLE_FLASH_ATTN") == "1":
+# Check Flash Attention compatibility if auto-detection is enabled
+need_to_disable_flash_attn = args.disable_flash_attn or os.environ.get("DISABLE_FLASH_ATTN") == "1"
+
+if args.auto_detect_flash_attn:
+    try:
+        # Try to use our flash_attention_compatibility module
+        sys.path.insert(0, os.path.join(project_root, "scripts"))
+        from flash_attention_compatibility import is_flash_attention_compatible
+        
+        if not is_flash_attention_compatible():
+            print("Automatically detected Flash Attention incompatibility - will disable it")
+            need_to_disable_flash_attn = True
+        else:
+            print("Flash Attention compatibility check passed - will use Flash Attention")
+    except ImportError:
+        print("Could not import flash_attention_compatibility module, skipping auto-detection")
+        # Try a simple check for GLIBC version
+        try:
+            import ctypes
+            import re
+            
+            # Try to get GLIBC version
+            process_namespace = ctypes.CDLL(None)
+            if hasattr(process_namespace, 'gnu_get_libc_version'):
+                gnu_get_libc_version = process_namespace.gnu_get_libc_version
+                gnu_get_libc_version.restype = ctypes.c_char_p
+                version_str = gnu_get_libc_version().decode('utf-8')
+                
+                # Check if version is below 2.32 (Flash Attention typically needs 2.32+)
+                match = re.match(r'(\d+)\.(\d+)', version_str)
+                if match:
+                    major, minor = int(match.group(1)), int(match.group(2))
+                    if major < 2 or (major == 2 and minor < 32):
+                        print(f"Detected GLIBC {version_str}, which is below 2.32 - will disable Flash Attention")
+                        need_to_disable_flash_attn = True
+                    else:
+                        print(f"Detected GLIBC {version_str}, which should be compatible with Flash Attention")
+        except Exception as e:
+            print(f"Error during GLIBC version check: {e}")
+
+# Configure Flash Attention disabling if needed
+if need_to_disable_flash_attn:
     print("Flash Attention is disabled - will use standard attention implementation")
     
     # Set environment variable for consistent behavior across all modules
@@ -62,7 +103,6 @@ if args.disable_flash_attn or os.environ.get("DISABLE_FLASH_ATTN") == "1":
     os.environ["USE_FLASH_ATTENTION"] = "0"
     
     # Create mock flash attention modules instead of blocking imports completely
-    import sys
     import types
     
     # Create a mock flash_attn module with dummy implementations
