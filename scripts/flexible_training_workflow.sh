@@ -726,7 +726,7 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
                     --gpu-id 0 \
                     --disable-infini-attn \
                     --tensorboard-dir \"$BASELINE_TB_DIR\""
-            }
+            fi
         else
             # Normal mode (online)
             if [[ -f "$WRAP_SCRIPT" ]]; then
