@@ -293,7 +293,12 @@ class CoreAttention(nn.Module):
         q_sequence_mask: torch.Tensor,  # torch.BoolTensor [batch_size, q_length] (can be broadcasted to that size)
         kv_sequence_mask: torch.Tensor,  # torch.BoolTensor [batch_size, kv_length] (can be broadcasted to that size)
     ):
-        from flash_attn.flash_attn_interface import flash_attn_varlen_func
+        try:
+            from flash_attn.flash_attn_interface import flash_attn_varlen_func
+            FLASH_ATTN_AVAILABLE = True
+        except ImportError:
+            FLASH_ATTN_AVAILABLE = False
+            flash_attn_varlen_func = None
 
         # TODO @thomasw21: Compute once, instead of computing for each layers.
         cu_seqlens_q = torch.zeros((q_sequence_mask.shape[0] + 1), dtype=torch.int32, device=query_states.device)
@@ -366,7 +371,11 @@ class CausalSelfAttention(nn.Module, AttachableStore):
         tp_pg: dist.ProcessGroup,
         layer_idx: int,
     ):
-        from flash_attn.layers.rotary import RotaryEmbedding as FlashRotaryEmbedding
+        try:
+            from flash_attn.layers.rotary import RotaryEmbedding as FlashRotaryEmbedding
+        except ImportError as e:
+            print(f"Warning: FlashAttention not available ({e}). Using standard RotaryEmbedding instead.")
+            FlashRotaryEmbedding = None
 
         super().__init__()
         # Tensor parallel considerations: We split tensors along head dimension
@@ -443,9 +452,13 @@ class CausalSelfAttention(nn.Module, AttachableStore):
         # self.rotary_embedding = RotaryEmbedding(dim=self.d_qk, end=2048)
 
         # NOTE: Only supported for training (TODO(fmom): position_ids not supported yet)
-        self.flash_rotary_embedding = FlashRotaryEmbedding(
-            dim=self.d_qk, interleaved=config.rope_interleaved, base=config.rope_theta
-        )
+        if FlashRotaryEmbedding is not None:
+            self.flash_rotary_embedding = FlashRotaryEmbedding(
+                dim=self.d_qk, interleaved=config.rope_interleaved, base=config.rope_theta
+            )
+        else:
+            # Fallback to standard RotaryEmbedding if FlashAttention is not available
+            self.flash_rotary_embedding = self.rotary_embedding
 
         self.o_proj = TensorParallelRowLinear(
             config.num_attention_heads * self.d_qk,
