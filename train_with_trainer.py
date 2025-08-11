@@ -104,10 +104,26 @@ def parse_args():
         help="Automatically detect Flash Attention compatibility"
     )
     parser.add_argument(
+        "--disable-flash-attn", 
+        action="store_true",
+        help="Forcibly disable Flash Attention regardless of compatibility"
+    )
+    parser.add_argument(
+        "--micro-batch-size", 
+        type=int, 
+        default=None,
+        help="Override micro batch size from config"
+    )
+    parser.add_argument(
         "--num-workers", 
         type=int, 
         default=4,
         help="Number of workers for data loading"
+    )
+    parser.add_argument(
+        "--debug", 
+        action="store_true",
+        help="Run in debug mode with additional logging"
     )
     return parser.parse_args()
 
@@ -124,13 +140,22 @@ def main():
     """Main training function."""
     args = parse_args()
     
-    # Check if Flash Attention is compatible
-    if args.auto_detect_flash_attn:
+    # Configure logging level
+    if args.debug:
+        logging.getLogger().setLevel(logging.DEBUG)
+        nanotron_logging.set_rank_logger_level(level=logging.DEBUG)
+        logger.debug("Debug mode enabled - verbose logging activated")
+    
+    # Check Flash Attention compatibility or disable it if requested
+    if args.disable_flash_attn:
+        logger.info("Flash Attention explicitly disabled via command line option")
+        disable_flash_attention()
+    elif args.auto_detect_flash_attn:
         is_compatible, error_msg = detect_flash_attention_compatibility()
         if not is_compatible:
             logger.warning(f"Flash Attention is not compatible: {error_msg}")
             disable_flash_attention()
-            
+    
     # Initialize the trainer
     logger.info(f"Initializing trainer with config: {args.config_file}")
     trainer = DistributedTrainer(args.config_file)
@@ -139,6 +164,12 @@ def main():
     input_pp_rank = trainer.unwrapped_model.input_pp_rank
     output_pp_rank = trainer.unwrapped_model.output_pp_rank
     sequence_length = trainer.config.tokens.sequence_length
+    
+    # Override micro_batch_size if provided as command line argument
+    if args.micro_batch_size is not None:
+        logger.info(f"Overriding micro batch size from {trainer.config.tokens.micro_batch_size} to {args.micro_batch_size}")
+        trainer.config.tokens.micro_batch_size = args.micro_batch_size
+    
     micro_batch_size = trainer.config.tokens.micro_batch_size
     
     # Set output directory if provided

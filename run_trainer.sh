@@ -137,6 +137,8 @@ if [ "$DEBUG_MODE" = true ]; then
   
   # Use smaller micro batch size and fewer workers to debug
   DEBUG_TRAIN_CMD=$(echo "$TRAIN_CMD" | sed 's/--num-workers [0-9]*/--num-workers 1/' | sed 's/--micro-batch-size [0-9]*/--micro-batch-size 1/')
+  # Add debug flag to the Python script
+  DEBUG_TRAIN_CMD+=" --debug"
   
   if [ "$NUM_GPUS" -gt 1 ]; then
     echo "Running multi-GPU debug command..." | tee -a "$LOG_FILE"
