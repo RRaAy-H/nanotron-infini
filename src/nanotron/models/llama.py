@@ -366,9 +366,30 @@ class CausalSelfAttention(nn.Module, AttachableStore):
         tp_pg: dist.ProcessGroup,
         layer_idx: int,
     ):
-        from flash_attn.layers.rotary import RotaryEmbedding as FlashRotaryEmbedding
-
         super().__init__()
+        
+        import os
+        # Try to import Flash Attention, but handle GLIBC errors gracefully
+        try:
+            from flash_attn.layers.rotary import RotaryEmbedding as FlashRotaryEmbedding
+            flash_rotary_available = True
+        except (ImportError, OSError) as e:
+            import warnings
+            warnings.warn(f"Flash Attention import failed: {e}. Using standard attention implementation.")
+            flash_rotary_available = False
+            
+            # Define a dummy FlashRotaryEmbedding class as fallback
+            class FlashRotaryEmbedding:
+                def __init__(self, dim, interleaved=False, base=10000.0):
+                    self.dim = dim
+                    self.interleaved = interleaved
+                    self.base = base
+                    
+                def __call__(self, q, kv=None):
+                    # Fallback implementation without flash attention
+                    warnings.warn("Using fallback implementation of RotaryEmbedding without Flash Attention")
+                    return q, kv
+
         # Tensor parallel considerations: We split tensors along head dimension
         assert (
             config.num_attention_heads % tp_pg.size() == 0

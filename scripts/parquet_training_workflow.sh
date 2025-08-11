@@ -172,7 +172,8 @@ TRAIN_CMD="python \"$WRAP_SCRIPT\" \
     --config-file \"$CONFIG_FILE\" \
     --data-dir \"$PREPROCESSED_DATA\" \
     --gpu-id \"$GPU_ID\" \
-    --tensorboard-dir \"$TENSORBOARD_DIR\""
+    --tensorboard-dir \"$TENSORBOARD_DIR\" \
+    --auto-detect-flash-attn"
 
 # Add optional flags
 if [[ "$DISABLE_INFINI_ATTN" = true ]]; then
