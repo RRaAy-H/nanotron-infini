@@ -70,7 +70,7 @@ optimizer:
 
 # Parallelism Configuration (adjust based on your GPU setup)
 parallelism:
-  dp: 1  # Single GPU - adjust this for your setup
+  dp: 8  # Use all 8 GPUs for faster training
   tp: 1  # Tensor parallelism
   expert_parallel_size: 1
   pp: 1  # Pipeline parallelism
@@ -127,8 +127,5 @@ logging:
 # Profiler (disabled for simplicity)
 profiler: null
 
-# Experiment logging
-experiment_logger:
-  tensorboard_logger:
-    flush_secs: 30
-    tensorboard_dir: ./tb_logs
+# Note: TensorBoard logging not available in this version of nanotron
+# Monitor training progress through console output and checkpoints
