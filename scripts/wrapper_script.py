@@ -109,8 +109,13 @@ if not patch_result:
 
 # Now run the actual training script
 if __name__ == "__main__":
-    # Get the script path and arguments
-    script_path = os.path.join(project_root, "scripts", "run_direct_training.py")
+    # Try multiple possible locations for the training script
+    possible_paths = [
+        os.path.join(project_root, "scripts", "run_direct_training.py"),  # Standard path
+        os.path.join(os.path.dirname(__file__), "run_direct_training.py"),  # Same directory as wrapper
+        "/scripts/run_direct_training.py",  # Absolute path (sometimes used in containers)
+        os.path.abspath("run_direct_training.py"),  # Current directory
+    ]
     
     # Debugging info
     logger.info(f"Current environment:")
@@ -118,9 +123,28 @@ if __name__ == "__main__":
     logger.info(f"- Python version: {sys.version}")
     logger.info(f"- Working directory: {os.getcwd()}")
     logger.info(f"- PYTHONPATH: {os.environ.get('PYTHONPATH', 'not set')}")
+    logger.info(f"- Script directory: {os.path.dirname(__file__)}")
     
-    if not os.path.exists(script_path):
-        logger.error(f"Training script not found at: {script_path}")
+    # Find the first valid path
+    script_path = None
+    for path in possible_paths:
+        logger.info(f"Checking for training script at: {path}")
+        if os.path.exists(path):
+            script_path = path
+            logger.info(f"Found training script at: {script_path}")
+            break
+    
+    if script_path is None:
+        # Last resort: search for the file in the project
+        logger.warning("Training script not found in expected locations, searching...")
+        for root, _, files in os.walk(project_root):
+            if "run_direct_training.py" in files:
+                script_path = os.path.join(root, "run_direct_training.py")
+                logger.info(f"Found training script by search at: {script_path}")
+                break
+    
+    if script_path is None:
+        logger.error("Training script run_direct_training.py not found anywhere!")
         sys.exit(1)
     
     logger.info(f"Running training script: {script_path}")

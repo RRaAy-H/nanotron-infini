@@ -709,6 +709,7 @@ print('Offline mode patch: Environment configured to apply patch automatically')
 import os
 import sys
 import importlib.util
+import subprocess
 
 # Load the offline patch first
 patch_path = os.environ.get('TRANSFORMERS_OFFLINE_PATCH', '/tmp/transformers_offline_patch.py')
@@ -739,13 +740,31 @@ if len(sys.argv) < 2:
 script_path = sys.argv[1]
 sys.argv = sys.argv[1:]  # Shift arguments
 
-# Execute the target script
-try:
-    with open(script_path) as f:
-        exec(compile(f.read(), script_path, 'exec'))
-except Exception as e:
-    print(f"Error executing {script_path}: {e}")
-    sys.exit(1)
+# Get the root project directory by looking for nanotron-infini from script path
+project_root = None
+current_path = os.path.dirname(os.path.abspath(script_path))
+while current_path != '/':
+    if os.path.basename(current_path) == 'nanotron-infini':
+        project_root = current_path
+        break
+    parent = os.path.dirname(current_path)
+    if parent == current_path:  # Reached root directory
+        break
+    current_path = parent
+
+# If we found the project root, add it to the PYTHONPATH
+if project_root:
+    print(f"Found project root: {project_root}")
+    # Add project root and src directories to PYTHONPATH
+    if 'PYTHONPATH' in os.environ:
+        os.environ['PYTHONPATH'] = f"{project_root}:{project_root}/src:{os.environ['PYTHONPATH']}"
+    else:
+        os.environ['PYTHONPATH'] = f"{project_root}:{project_root}/src"
+
+# Execute the target script as a subprocess to maintain the proper module structure
+print(f"Running: {sys.executable} {script_path} {' '.join(sys.argv[1:])}")
+result = subprocess.run([sys.executable, script_path] + sys.argv[1:])
+sys.exit(result.returncode)
 EOF
 
     chmod +x "$OFFLINE_WRAPPER_SCRIPT"
