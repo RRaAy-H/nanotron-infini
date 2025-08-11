@@ -143,7 +143,7 @@ def main():
     # Configure logging level
     if args.debug:
         logging.getLogger().setLevel(logging.DEBUG)
-        nanotron_logging.set_rank_logger_level(level=logging.DEBUG)
+        nanotron_logging.set_ranks_logging_level(level=logging.DEBUG)
         logger.debug("Debug mode enabled - verbose logging activated")
     
     # Check Flash Attention compatibility or disable it if requested
