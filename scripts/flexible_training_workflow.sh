@@ -656,20 +656,15 @@ try:
             # First try with the normal method but with local_files_only
             return original_from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
         except (OSError, ValueError) as e:
-                    merges_file=None,
-                    unk_token='<|endoftext|>',
-                    bos_token='<|endoftext|>',
-                    eos_token='<|endoftext|>'
-                )
-            else:
-                # Generic tokenizer
-                from transformers import PreTrainedTokenizer
-                return PreTrainedTokenizer(
-                    unk_token='[UNK]',
-                    pad_token='[PAD]',
-                    bos_token='[BOS]',
-                    eos_token='[EOS]'
-                )
+            # Try with a basic tokenizer as a fallback
+            print(f"Failed to load tokenizer {pretrained_model_name_or_path}, creating basic tokenizer")
+            from transformers import PreTrainedTokenizer
+            return PreTrainedTokenizer(
+                unk_token='[UNK]',
+                pad_token='[PAD]',
+                bos_token='[BOS]',
+                eos_token='[EOS]'
+            )
     
     # Apply the patch
     AutoTokenizer.from_pretrained = patched_from_pretrained
@@ -740,10 +735,12 @@ if len(sys.argv) < 2:
 script_path = sys.argv[1]
 sys.argv = sys.argv[1:]  # Shift arguments
 
-# Get the root project directory by looking for nanotron-infini from script path
+# Find project root - multiple strategies for robustness
 project_root = None
+
+# Strategy 1: Look for nanotron-infini in script path
 current_path = os.path.dirname(os.path.abspath(script_path))
-while current_path != '/':
+while current_path and current_path != '/':
     if os.path.basename(current_path) == 'nanotron-infini':
         project_root = current_path
         break
@@ -752,23 +749,108 @@ while current_path != '/':
         break
     current_path = parent
 
-# If we found the project root, add it to the PYTHONPATH
+# Strategy 2: Look in current working directory
+if not project_root:
+    cwd = os.getcwd()
+    if 'nanotron-infini' in cwd:
+        # Find the project root by looking for nanotron-infini in the path
+        parts = cwd.split('nanotron-infini')
+        if len(parts) > 1:
+            project_root = parts[0] + 'nanotron-infini'
+            print(f"Found project root from CWD: {project_root}")
+
+# Strategy 3: Check if script path contains a scripts directory
+if not project_root and '/scripts/' in script_path:
+    parts = script_path.split('/scripts/')
+    if len(parts) > 1:
+        potential_root = parts[0]
+        # Verify this looks like a project root
+        if os.path.isdir(os.path.join(potential_root, 'src')) and os.path.isdir(os.path.join(potential_root, 'scripts')):
+            project_root = potential_root
+            print(f"Found project root from script path structure: {project_root}")
+
+# Export PROJECT_ROOT environment variable
 if project_root:
     print(f"Found project root: {project_root}")
+    os.environ['PROJECT_ROOT'] = project_root
     # Add project root and src directories to PYTHONPATH
     if 'PYTHONPATH' in os.environ:
         os.environ['PYTHONPATH'] = f"{project_root}:{project_root}/src:{os.environ['PYTHONPATH']}"
     else:
         os.environ['PYTHONPATH'] = f"{project_root}:{project_root}/src"
+else:
+    print("WARNING: Could not determine project root, training might fail due to path issues")
 
-# Execute the target script as a subprocess to maintain the proper module structure
+# Make sure the script can find run_direct_training.py
+scripts_dir = None
+if project_root:
+    scripts_dir = os.path.join(project_root, 'scripts')
+    # Check for training script directly
+    training_script = os.path.join(scripts_dir, 'run_direct_training.py')
+    if os.path.exists(training_script):
+        print(f"Found training script at: {training_script}")
+    else:
+        print(f"WARNING: Training script not found at {training_script}")
+
+# Debug information
+print(f"Script to run: {script_path}")
+print(f"Current working directory: {os.getcwd()}")
+print(f"PYTHONPATH: {os.environ.get('PYTHONPATH', 'not set')}")
+
+# Try to execute the target script as a subprocess with environment properly set
 print(f"Running: {sys.executable} {script_path} {' '.join(sys.argv[1:])}")
-result = subprocess.run([sys.executable, script_path] + sys.argv[1:])
-sys.exit(result.returncode)
+try:
+    result = subprocess.run([sys.executable, script_path] + sys.argv[1:], env=os.environ)
+    
+    # If the script failed with a non-zero exit code and it's the wrapper script
+    if result.returncode != 0 and os.path.basename(script_path) == 'wrapper_script.py':
+        print("Wrapper script failed, trying direct fallback mechanism...")
+        
+        # Check for direct_training_fallback.py
+        fallback_script = None
+        if project_root:
+            fallback_script = os.path.join(project_root, 'scripts', 'direct_training_fallback.py')
+        
+        if fallback_script and os.path.exists(fallback_script):
+            print(f"Running fallback script: {fallback_script}")
+            fallback_result = subprocess.run([sys.executable, fallback_script] + sys.argv[1:], env=os.environ)
+            sys.exit(fallback_result.returncode)
+        else:
+            print("No fallback script found, exiting with error")
+            sys.exit(result.returncode)
+    else:
+        sys.exit(result.returncode)
+except Exception as e:
+    print(f"Error executing script: {e}")
+    # Try fallback mechanism
+    print("Error occurred, attempting direct fallback import...")
+    try:
+        # Try to find run_direct_training.py directly
+        direct_script = None
+        if project_root:
+            direct_script = os.path.join(project_root, 'scripts', 'run_direct_training.py')
+            
+        if direct_script and os.path.exists(direct_script):
+            print(f"Found direct training script: {direct_script}")
+            # Try to run it directly
+            direct_result = subprocess.run([sys.executable, direct_script] + sys.argv[1:], env=os.environ)
+            sys.exit(direct_result.returncode)
+        else:
+            print("Could not find direct training script for fallback")
+            sys.exit(1)
+    except Exception as e2:
+        print(f"Fallback also failed: {e2}")
+        sys.exit(1)
 EOF
 
     chmod +x "$OFFLINE_WRAPPER_SCRIPT"
     echo "Offline mode wrapper script created at $OFFLINE_WRAPPER_SCRIPT"
+fi
+
+# Make our fallback script executable
+if [[ -f "$PROJECT_ROOT/scripts/direct_training_fallback.py" ]]; then
+    chmod +x "$PROJECT_ROOT/scripts/direct_training_fallback.py"
+    echo "Made fallback script executable"
 fi
 
 # Apply the Adam optimizer patch directly before training
@@ -846,6 +928,31 @@ fi
 # Ensure the wrapper script is executable
 chmod +x "$WRAP_SCRIPT"
 echo "Using wrapper script with Adam optimizer patches: $WRAP_SCRIPT"
+
+# Create a symbolic link to run_direct_training.py in /scripts/ directory if it's needed
+if [[ "$OFFLINE_MODE" = true ]]; then
+    echo "Setting up symlinks for offline mode compatibility..."
+    
+    # Check if the directory /scripts exists, create it if needed
+    if [[ ! -d "/scripts" ]]; then
+        echo "Creating /scripts directory for compatibility (requires sudo)"
+        sudo mkdir -p /scripts || echo "WARNING: Failed to create /scripts directory - may require admin privileges"
+    fi
+    
+    # Find the direct training script
+    DIRECT_TRAIN_SCRIPT="$PROJECT_ROOT/scripts/run_direct_training.py"
+    if [[ -f "$DIRECT_TRAIN_SCRIPT" ]]; then
+        # Try to create symlink if we have write permissions
+        if [[ -d "/scripts" && -w "/scripts" ]]; then
+            echo "Creating symlink to training script at /scripts/run_direct_training.py"
+            sudo ln -sf "$DIRECT_TRAIN_SCRIPT" /scripts/run_direct_training.py || echo "WARNING: Failed to create symlink"
+        else
+            echo "WARNING: Cannot create symlink in /scripts directory - no write permission"
+        fi
+    else
+        echo "WARNING: Could not find run_direct_training.py at $DIRECT_TRAIN_SCRIPT"
+    fi
+fi
 
 # Debug output to verify the wrapper script exists
 echo "Wrapper script path: $WRAP_SCRIPT"

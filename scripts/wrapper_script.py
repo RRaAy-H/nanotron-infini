@@ -17,8 +17,28 @@ import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Get project root directory
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+# Get project root directory - use multiple strategies for robustness
+script_dir = os.path.dirname(os.path.abspath(__file__))
+# Strategy 1: Standard method - go up one directory from scripts folder
+project_root = os.path.abspath(os.path.join(script_dir, '..'))
+
+# Strategy 2: If absolute path doesn't seem right (very short), try to find it from current working directory
+if len(project_root) < 10:  # If suspiciously short
+    cwd = os.getcwd()
+    if 'nanotron-infini' in cwd:
+        # Find the project root by looking for nanotron-infini in the path
+        parts = cwd.split('nanotron-infini')
+        if len(parts) > 1:
+            project_root = parts[0] + 'nanotron-infini'
+            logger.info(f"Using project root from CWD: {project_root}")
+
+# Strategy 3: Check environment variable
+if 'PROJECT_ROOT' in os.environ:
+    project_root = os.environ['PROJECT_ROOT']
+    logger.info(f"Using project root from environment: {project_root}")
+
+logger.info(f"Project root directory: {project_root}")
+logger.info(f"Script directory: {script_dir}")
 
 # Add directories to Python path
 sys.path.insert(0, project_root)
@@ -144,8 +164,42 @@ if __name__ == "__main__":
                 break
     
     if script_path is None:
-        logger.error("Training script run_direct_training.py not found anywhere!")
-        sys.exit(1)
+        # Additional diagnostic information to help troubleshoot
+        project_structure = []
+        scripts_dir = os.path.join(project_root, "scripts")
+        if os.path.exists(scripts_dir):
+            logger.info(f"Contents of scripts directory ({scripts_dir}):")
+            try:
+                for item in os.listdir(scripts_dir):
+                    project_structure.append(f"  - {item}")
+                    logger.info(f"  - {item}")
+            except Exception as e:
+                logger.error(f"Failed to list directory contents: {e}")
+        else:
+            logger.error(f"Scripts directory not found at {scripts_dir}")
+            
+        # Try direct import
+        try:
+            import run_direct_training
+            script_path = run_direct_training.__file__
+            logger.info(f"Found training script via import at: {script_path}")
+        except ImportError:
+            logger.error("Could not import run_direct_training as a module")
+            
+        if script_path is None:
+            # Give up and provide helpful error information
+            logger.error("-----------------------------------------------------------")
+            logger.error("ERROR: Training script run_direct_training.py not found!")
+            logger.error("Possible reasons:")
+            logger.error("1. The script might be in a different location than expected")
+            logger.error("2. There might be permission issues accessing the file")
+            logger.error("3. The project structure might be different than expected")
+            logger.error("")
+            logger.error("Try running one of these commands to find the script:")
+            logger.error("  find /path/to/project -name run_direct_training.py")
+            logger.error("  locate run_direct_training.py")
+            logger.error("-----------------------------------------------------------")
+            sys.exit(1)
     
     logger.info(f"Running training script: {script_path}")
     logger.info(f"With arguments: {sys.argv[1:]}")
