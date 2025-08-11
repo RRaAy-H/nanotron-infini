@@ -19,8 +19,15 @@ class ParallelContext:
         backend: DistributedBackend = "nccl",
     ):
         """Initialize parallel context."""
+        # Initialize distributed environment first if not already done
+        if not dist.is_available():
+            raise ValueError("torch.distributed is not available as a package, please install it.")
+        
+        if not dist.is_initialized():
+            dist.initialize_torch_distributed()
+        
         num_gpus_per_model = tensor_parallel_size * pipeline_parallel_size * expert_parallel_size
-        world_size = int(os.environ["WORLD_SIZE"])
+        world_size = int(os.getenv("WORLD_SIZE", "1"))
 
         assert (
             world_size % data_parallel_size == 0
@@ -35,9 +42,6 @@ class ParallelContext:
                 f"must be equal to the world size ({world_size}).",
             )
 
-        if not dist.is_available():
-            raise ValueError("torch.distributed is not available as a package, please install it.")
-
         self.tensor_parallel_size = tensor_parallel_size
         self.pipeline_parallel_size = pipeline_parallel_size
         self.data_parallel_size = data_parallel_size
@@ -48,11 +52,6 @@ class ParallelContext:
         self.set_device()
 
         assert backend == "nccl", "Only nccl backend is supported for now."
-
-        if not dist.is_initialized():
-            dist.initialize_torch_distributed()
-
-        world_size = int(os.getenv("WORLD_SIZE", "1"))
         ranks = list(range(world_size))
         process_group = dist.new_group(
             ranks=ranks,

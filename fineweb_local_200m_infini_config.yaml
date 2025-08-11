@@ -70,7 +70,7 @@ optimizer:
 
 # Parallelism Configuration (adjust based on your GPU setup)
 parallelism:
-  dp: 8  # Use all 8 GPUs for faster training
+  dp: 1  # Start with single GPU first
   tp: 1  # Tensor parallelism
   expert_parallel_size: 1
   pp: 1  # Pipeline parallelism
