@@ -412,6 +412,21 @@ if [[ "$DISABLE_FLASH_ATTENTION" = true ]]; then
     # Add the flag to the training command
     TRAIN_CMD="$TRAIN_CMD --disable-flash-attn"
     
+    # Apply the Flash Attention compatibility layer to avoid import errors
+    if [[ -f "$PROJECT_ROOT/scripts/flash_attention_compatibility.py" ]]; then
+        echo "Applying Flash Attention compatibility layer..."
+        PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH" python "$PROJECT_ROOT/scripts/flash_attention_compatibility.py"
+        COMPATIBILITY_STATUS=$?
+        
+        if [[ $COMPATIBILITY_STATUS -eq 0 ]]; then
+            echo "Flash Attention compatibility layer applied successfully"
+        else
+            echo "Warning: Failed to apply Flash Attention compatibility layer - training may fail"
+        fi
+    else
+        echo "Warning: Flash Attention compatibility script not found at $PROJECT_ROOT/scripts/flash_attention_compatibility.py"
+    fi
+    
     # Log the action for diagnostic purposes
     echo "[$(date +"%Y-%m-%d %H:%M:%S")] Flash Attention disabled due to compatibility issue: $FLASH_ATTN_ERROR" >> "$PROJECT_ROOT/flash_attention_log.txt"
 fi

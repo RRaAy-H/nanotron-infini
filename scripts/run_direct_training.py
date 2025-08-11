@@ -61,20 +61,44 @@ if args.disable_flash_attn or os.environ.get("DISABLE_FLASH_ATTN") == "1":
     # Also set this environment variable for transformers library compatibility
     os.environ["USE_FLASH_ATTENTION"] = "0"
     
-    # Monkey patch to prevent flash attention import attempts
+    # Create mock flash attention modules instead of blocking imports completely
     import sys
-    class FlashAttentionBlocker:
-        def find_spec(self, fullname, path, target=None):
-            if fullname.startswith('flash_attn'):
-                # Print warning only once
-                if not hasattr(sys, "_flash_attn_warning_shown"):
-                    print(f"Import of {fullname} was blocked because Flash Attention is disabled")
-                    sys._flash_attn_warning_shown = True
-                raise ImportError(f"Flash Attention disabled: {fullname} import blocked")
-            return None
+    import types
     
-    # Add our import blocker to sys.meta_path
-    sys.meta_path.insert(0, FlashAttentionBlocker())
+    # Create a mock flash_attn module with dummy implementations
+    mock_flash_attn = types.ModuleType('flash_attn')
+    sys.modules['flash_attn'] = mock_flash_attn
+    
+    # Create layers submodule
+    mock_layers = types.ModuleType('flash_attn.layers')
+    sys.modules['flash_attn.layers'] = mock_layers
+    mock_flash_attn.layers = mock_layers
+    
+    # Create rotary submodule
+    mock_rotary = types.ModuleType('flash_attn.layers.rotary')
+    sys.modules['flash_attn.layers.rotary'] = mock_rotary
+    mock_layers.rotary = mock_rotary
+    
+    # Create ops submodule
+    mock_ops = types.ModuleType('flash_attn.ops')
+    sys.modules['flash_attn.ops'] = mock_ops
+    mock_flash_attn.ops = mock_ops
+    
+    # Add dummy version attribute
+    mock_flash_attn.__version__ = "0.0.0-disabled"
+    
+    # Create dummy RotaryEmbedding class
+    class DummyRotaryEmbedding:
+        def __init__(self, *args, **kwargs):
+            print("Using dummy RotaryEmbedding (Flash Attention disabled)")
+            
+        def __call__(self, *args, **kwargs):
+            raise NotImplementedError("Flash Attention is disabled")
+    
+    # Add the dummy class to the mock module
+    mock_rotary.RotaryEmbedding = DummyRotaryEmbedding
+    
+    print("Mock Flash Attention modules created for compatibility")
     
     # Try to prevent flash_attn imports in modules that might use it
     try:

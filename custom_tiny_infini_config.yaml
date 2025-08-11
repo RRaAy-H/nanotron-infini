@@ -1,0 +1,117 @@
+# Configuration for pretraining Infini-Llama with the tiny dataset
+
+checkpoints:
+  checkpoint_interval: 1000
+  checkpoints_path: "./infini_llama_checkpoints"
+  checkpoints_path_is_shared_file_system: false
+  resume_checkpoint_path: null
+  save_initial_state: true
+
+general:
+  benchmark_csv_path: null
+  consumed_train_samples: null
+  ignore_sanity_checks: true
+  project: infini_llama_tiny
+  run: infini_llama_tiny_%date_%jobid
+  seed: 42
+  step: null
+
+logging:
+  iteration_step_info_interval: 1
+  log_level: info
+  log_level_replica: info
+
+infini_attention:
+  segment_length: 64
+  turn_on_memory: true
+  balance_init_type: zeros
+  balance_act_type: orig_sigmoid
+  balance_factor_lr: 0.001
+  logging: false
+  logging_interval: 100
+  log_grad: false
+  log_segment_acts: false
+
+model:
+  ddp_bucket_cap_mb: 25
+  dtype: bfloat16
+  init_method:
+    std: 0.02
+  make_vocab_size_divisible_by: 1
+  model_config:
+    bos_token_id: 1
+    eos_token_id: 2
+    hidden_act: silu
+    hidden_size: 768
+    initializer_range: 0.02
+    intermediate_size: 3072
+    is_llama_config: true
+    max_position_embeddings: 2048
+    num_hidden_layers: 12
+    num_attention_heads: 12
+    num_key_value_heads: 12
+    pad_token_id: null
+    pretraining_tp: 1
+    rms_norm_eps: 1.0e-05
+    rope_scaling: null
+    rope_theta: 10000.0
+    rope_interleaved: false
+    tie_word_embeddings: false
+    use_cache: true
+    vocab_size: 32000
+
+optimizer:
+  accumulate_grad_in_fp32: true
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_eps: 1.0e-08
+  clip_grad: 1.0
+  learning_rate_scheduler:
+    learning_rate: 0.0001
+    lr_decay_starting_step: null
+    lr_decay_steps: null
+    lr_decay_style: cosine
+    lr_warmup_steps: 1000
+    lr_warmup_style: linear
+    min_decay_lr: 1.0e-05
+  torch_adam_is_fused: true
+  weight_decay: 0.1
+  zero_stage: 0
+
+parallelism:
+  dp: 1
+  expert_parallel_size: 1
+  pp: 1
+  pp_engine: 1f1b
+  tp: 1
+  tp_linear_async_communication: true
+  tp_mode: REDUCE_SCATTER
+
+data_stages:
+  - name: Training Stage
+    start_training_step: 1
+    data:
+      dataset:
+        dataset_overwrite_cache: false
+        dataset_processing_num_proc_per_process: 4
+        hf_dataset_config_name: "default"
+        # Using the specified dataset path
+        hf_dataset_or_datasets: "/data1/dataset/HuggingFaceFW/processes/tiny"
+        hf_dataset_splits: ["train"]
+        text_column_name: "text"
+      num_loading_workers: 4
+      seed: 42
+
+tokenizer:
+  tokenizer_max_length: null
+  tokenizer_name_or_path: meta-llama/Llama-2-7b-hf
+  tokenizer_revision: null
+
+tokens:
+  batch_accumulation_per_replica: 4
+  limit_test_batches: 0
+  limit_val_batches: 0
+  micro_batch_size: 4
+  sequence_length: 2048
+  train_steps: 10000
+  val_check_interval: -1
