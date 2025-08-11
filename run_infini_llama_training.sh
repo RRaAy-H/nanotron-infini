@@ -16,7 +16,7 @@ echo "======= Infini-Llama Training Pipeline ======="
 echo "Current directory: $(pwd)"
 
 # Data directory to use
-DATA_DIR="/data1/dataset/HuggingFaceFW/processes/tiny"
+DATA_DIR="/data1/dataset/HuggingFaceFW/processed/tiny"
 echo "Using data directory: $DATA_DIR"
 
 # Step 1: Check and prepare the dataset

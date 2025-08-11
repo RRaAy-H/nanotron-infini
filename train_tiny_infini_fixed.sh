@@ -33,7 +33,7 @@ mkdir -p models
 chmod +x train_infini_llama_fixed.py
 
 # Data directory to use
-DATA_DIR="/data1/dataset/HuggingFaceFW/processes/tiny"
+DATA_DIR="/data1/dataset/HuggingFaceFW/processed/tiny"
 echo "Using data directory: $DATA_DIR"
 
 # Run the fixed training script with the custom configuration

@@ -11,19 +11,19 @@ proper Flash Attention support when available.
 Usage:
 ```
 # Basic usage with preprocessed data:
-python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processes/tiny
+python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processed/tiny
 
 # For GPU training with Flash Attention:
-python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processes/tiny
+python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processed/tiny
 
 # For GPU training without Flash Attention:
-python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processes/tiny --disable-flash-attn
+python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processed/tiny --disable-flash-attn
 
 # For CPU-only training:
-python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processes/tiny --cpu-only
+python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processed/tiny --cpu-only
 
 # With TensorBoard integration:
-python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processes/tiny --tensorboard-dir tensorboard_logs
+python train_infini_llama_fixed.py --config-file custom_tiny_infini_config.yaml --data-dir /data1/dataset/HuggingFaceFW/processed/tiny --tensorboard-dir tensorboard_logs
 ```
 """
 
