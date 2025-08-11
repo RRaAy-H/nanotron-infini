@@ -330,6 +330,15 @@ export CUDA_VISIBLE_DEVICES=$GPU_ID
 # Set up environment variables for proper path resolution
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
 
+# Check if Flash Attention is available, and disable it if not
+DISABLE_FLASH_ATTENTION=false
+if ! python -c "import flash_attn" &>/dev/null; then
+    echo "Flash Attention is not installed. Automatically disabling it."
+    DISABLE_FLASH_ATTENTION=true
+    # Set environment variable to disable Flash Attention
+    export DISABLE_FLASH_ATTN=1
+fi
+
 # Set up distributed training environment variables for single GPU mode
 # These are needed by ParallelContext even in non-distributed mode
 export RANK=0
@@ -489,15 +498,6 @@ try:
             # First try with the normal method but with local_files_only
             return original_from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
         except (OSError, ValueError) as e:
-            print(f'Offline mode: Error loading tokenizer {pretrained_model_name_or_path} locally')
-            print(f'Offline mode: Creating a minimal tokenizer as fallback')
-            
-            # Create a minimal tokenizer for offline mode
-            if 'gpt2' in pretrained_model_name_or_path.lower():
-                # For GPT-2 models
-                from transformers import GPT2Tokenizer
-                return GPT2Tokenizer(
-                    vocab_file=None,
                     merges_file=None,
                     unk_token='<|endoftext|>',
                     bos_token='<|endoftext|>',
