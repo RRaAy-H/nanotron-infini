@@ -27,6 +27,7 @@ parser.add_argument("--gpu-id", type=int, default=0, help="GPU ID to use (defaul
 parser.add_argument("--tensorboard-dir", type=str, default=None, help="Directory for TensorBoard logs")
 parser.add_argument("--verbose", action="store_true", help="Enable verbose logging")
 parser.add_argument("--use-gpu-dataloader", action="store_true", help="Use GPU-accelerated dataloader")
+parser.add_argument("--offline-mode", action="store_true", help="Run in offline mode (no downloads from HuggingFace)")
 args = parser.parse_args()
 
 # Configure the environment
@@ -36,6 +37,28 @@ os.environ["CUDA_VISIBLE_DEVICES"] = str(args.gpu_id)
 if args.verbose:
     os.environ["NANOTRON_LOG_LEVEL"] = "debug"
     print("Verbose logging enabled")
+
+# Configure offline mode if requested
+if args.offline_mode:
+    print("Configuring offline mode to avoid HuggingFace downloads...")
+    # Set HuggingFace environment variables to use local files only
+    os.environ["HF_DATASETS_OFFLINE"] = "1"
+    os.environ["TRANSFORMERS_OFFLINE"] = "1"
+    os.environ["HF_HUB_OFFLINE"] = "1"
+    os.environ["NO_GIT"] = "1"
+    # Disable HTTP requests 
+    os.environ["HF_HUB_DISABLE_TELEMETRY"] = "1"
+    os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+    os.environ["HF_HUB_DISABLE_IMPLICIT_TOKEN"] = "1"
+    # Set timeouts to minimal values to fail fast
+    os.environ["HF_HUB_DOWNLOAD_TIMEOUT"] = "1"
+    os.environ["REQUESTS_CA_BUNDLE"] = ""
+    os.environ["CURL_CA_BUNDLE"] = ""
+    # Clear any proxy settings
+    for proxy_var in ["http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY"]:
+        if proxy_var in os.environ:
+            del os.environ[proxy_var]
+    print("Environment configured for offline mode")
 
 # Apply multiple methods to fix the Adam optimizer weight_decay=None issue
 adam_patched = False

@@ -32,6 +32,7 @@ USE_GPU_DATALOADER=true
 FORCE_PREPROCESS=false
 DISABLE_FUSED_ADAM=true  # Set to true to avoid fused Adam optimizer errors
 VERBOSE=false
+OFFLINE_MODE=false  # Set to true to disable Hugging Face downloads
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -84,6 +85,10 @@ while [[ $# -gt 0 ]]; do
             VERBOSE=true
             shift
             ;;
+        --offline-mode)
+            OFFLINE_MODE=true
+            shift
+            ;;
         --help)
             echo "Flexible training workflow for Infini-Llama models"
             echo ""
@@ -102,6 +107,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --no-gpu-dataloader       Disable GPU-accelerated dataloader"
             echo "  --force-preprocess        Force preprocessing even if data exists"
             echo "  --verbose                 Enable verbose logging"
+            echo "  --offline-mode            Run in offline mode (no downloads from HuggingFace)"
             echo "  --help                    Show this help message and exit"
             exit 0
             ;;
@@ -266,20 +272,39 @@ fi
 
 # Build training command using our wrapper script
 # Make sure to provide the full path to the wrapper script
-if [[ -f "$WRAP_SCRIPT" ]]; then
-    TRAIN_CMD="python \"$WRAP_SCRIPT\" \
-        --config-file \"$CONFIG_FILE\" \
-        --data-dir \"$PREPROCESSED_DATA\" \
-        --gpu-id \"$GPU_ID\" \
-        --tensorboard-dir \"$TENSORBOARD_DIR\""
+if [[ "$OFFLINE_MODE" = true ]] && [[ -f "/tmp/offline_wrapper.py" ]]; then
+    # In offline mode, use the offline wrapper script
+    echo "Using offline wrapper script for training"
+    if [[ -f "$WRAP_SCRIPT" ]]; then
+        TRAIN_CMD="python \"/tmp/offline_wrapper.py\" \"$WRAP_SCRIPT\" \
+            --config-file \"$CONFIG_FILE\" \
+            --data-dir \"$PREPROCESSED_DATA\" \
+            --gpu-id \"$GPU_ID\" \
+            --tensorboard-dir \"$TENSORBOARD_DIR\""
+    else
+        TRAIN_CMD="python \"/tmp/offline_wrapper.py\" \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+            --config-file \"$CONFIG_FILE\" \
+            --data-dir \"$PREPROCESSED_DATA\" \
+            --gpu-id \"$GPU_ID\" \
+            --tensorboard-dir \"$TENSORBOARD_DIR\""
+    fi
 else
-    # Fallback to direct execution if wrapper script doesn't exist
-    echo "WARNING: Wrapper script not found, falling back to direct execution"
-    TRAIN_CMD="python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
-        --config-file \"$CONFIG_FILE\" \
-        --data-dir \"$PREPROCESSED_DATA\" \
-        --gpu-id \"$GPU_ID\" \
-        --tensorboard-dir \"$TENSORBOARD_DIR\""
+    # Normal mode (online)
+    if [[ -f "$WRAP_SCRIPT" ]]; then
+        TRAIN_CMD="python \"$WRAP_SCRIPT\" \
+            --config-file \"$CONFIG_FILE\" \
+            --data-dir \"$PREPROCESSED_DATA\" \
+            --gpu-id \"$GPU_ID\" \
+            --tensorboard-dir \"$TENSORBOARD_DIR\""
+    else
+        # Fallback to direct execution if wrapper script doesn't exist
+        echo "WARNING: Wrapper script not found, falling back to direct execution"
+        TRAIN_CMD="python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+            --config-file \"$CONFIG_FILE\" \
+            --data-dir \"$PREPROCESSED_DATA\" \
+            --gpu-id \"$GPU_ID\" \
+            --tensorboard-dir \"$TENSORBOARD_DIR\""
+    fi
 fi
 
 # Add optional flags
@@ -293,6 +318,10 @@ fi
 
 if [[ "$VERBOSE" = true ]]; then
     TRAIN_CMD="$TRAIN_CMD --verbose"
+fi
+
+if [[ "$OFFLINE_MODE" = true ]]; then
+    TRAIN_CMD="$TRAIN_CMD --offline-mode"
 fi
 
 # Set CUDA_VISIBLE_DEVICES
@@ -376,6 +405,182 @@ fi
 
 # Ensure the pre-import script with Adam optimizer patches is used in training
 export PYTHONPATH="$PROJECT_ROOT:$PROJECT_ROOT/src:$PYTHONPATH"
+
+# Configure offline mode if requested to avoid download issues
+if [[ "$OFFLINE_MODE" = true ]]; then
+    echo "Configuring offline mode to avoid HuggingFace downloads..."
+    # Set HuggingFace environment variables to use local files only
+    export HF_DATASETS_OFFLINE=1
+    export TRANSFORMERS_OFFLINE=1
+    export HF_HUB_OFFLINE=1
+    export NO_GIT=1
+    # Disable HTTP requests 
+    export HF_HUB_DISABLE_TELEMETRY=1
+    export HF_HUB_DISABLE_SYMLINKS_WARNING=1
+    export HF_HUB_DISABLE_IMPLICIT_TOKEN=1
+    # Set timeouts to minimal values to fail fast
+    export HF_HUB_DOWNLOAD_TIMEOUT=1
+    # Unset certificate bundles to avoid verification issues
+    export REQUESTS_CA_BUNDLE=""
+    export CURL_CA_BUNDLE=""
+    export SSL_CERT_FILE=""
+    # Clear any proxy settings
+    export http_proxy=""
+    export https_proxy=""
+    export HTTP_PROXY=""
+    export HTTPS_PROXY=""
+    export all_proxy=""
+    export ALL_PROXY=""
+    export no_proxy="*"
+    export NO_PROXY="*"
+    echo "Environment configured for offline mode"
+    
+    # Create a monkey patch for pipeline engine to handle offline mode
+    echo "Creating offline mode patches for pipeline engine..."
+    
+    # Create a simple Python patch that monkey patches the tokenizer initialization
+    python -c "
+import os
+import sys
+
+# Create a backup file for environment variables
+env_backup_file = '/tmp/env_vars_backup.txt'
+with open(env_backup_file, 'w') as f:
+    for key, value in os.environ.items():
+        if key.startswith('HF_') or key.lower().endswith('proxy'):
+            f.write(f'{key}={value}\\n')
+
+print('Offline mode patch: Environment variables backed up to', env_backup_file)
+
+# Create the monkey patching script for transformers
+patch_script = '''
+# Monkey patches for offline mode in transformers
+import os
+import sys
+import warnings
+from functools import wraps
+
+# Suppress all warnings from transformers about missing files
+warnings.filterwarnings('ignore', category=UserWarning)
+
+# Original imports that we need to patch
+try:
+    import transformers
+    from transformers import AutoTokenizer
+    
+    # Save original methods
+    original_from_pretrained = AutoTokenizer.from_pretrained
+    
+    # Patch AutoTokenizer.from_pretrained to force local_files_only=True
+    @wraps(original_from_pretrained)
+    def patched_from_pretrained(pretrained_model_name_or_path, *args, **kwargs):
+        # Set force_download and resume_download to False
+        kwargs['force_download'] = False
+        kwargs['resume_download'] = False
+        
+        # Set token to None to avoid token lookup
+        kwargs['token'] = None
+        
+        # Always use local files
+        kwargs['local_files_only'] = True
+        
+        try:
+            # First try with the normal method but with local_files_only
+            return original_from_pretrained(pretrained_model_name_or_path, *args, **kwargs)
+        except (OSError, ValueError) as e:
+            print(f'Offline mode: Error loading tokenizer {pretrained_model_name_or_path} locally')
+            print(f'Offline mode: Creating a minimal tokenizer as fallback')
+            
+            # Create a minimal tokenizer for offline mode
+            if 'gpt2' in pretrained_model_name_or_path.lower():
+                # For GPT-2 models
+                from transformers import GPT2Tokenizer
+                return GPT2Tokenizer(
+                    vocab_file=None,
+                    merges_file=None,
+                    unk_token='<|endoftext|>',
+                    bos_token='<|endoftext|>',
+                    eos_token='<|endoftext|>'
+                )
+            else:
+                # Generic tokenizer
+                from transformers import PreTrainedTokenizer
+                return PreTrainedTokenizer(
+                    unk_token='[UNK]',
+                    pad_token='[PAD]',
+                    bos_token='[BOS]',
+                    eos_token='[EOS]'
+                )
+    
+    # Apply the patch
+    AutoTokenizer.from_pretrained = patched_from_pretrained
+    print('Offline mode: Patched AutoTokenizer.from_pretrained to work offline')
+    
+except ImportError as e:
+    print(f'Warning: Could not patch transformers for offline mode: {e}')
+    pass
+
+# Set a flag that our patch was loaded
+os.environ['OFFLINE_MODE_PATCH_APPLIED'] = '1'
+'''
+
+# Write the patch to a file
+with open('/tmp/transformers_offline_patch.py', 'w') as f:
+    f.write(patch_script)
+
+print('Offline mode patch: Created transformer patch script at /tmp/transformers_offline_patch.py')
+print('Offline mode patch: Add this to your PYTHONPATH to apply patches at import time')
+
+# Set an environment variable to point to our patch
+os.environ['PYTHONPATH'] = '/tmp:' + os.environ.get('PYTHONPATH', '')
+os.environ['TRANSFORMERS_OFFLINE_PATCH'] = '/tmp/transformers_offline_patch.py'
+
+print('Offline mode patch: Environment configured to apply patch automatically')
+"
+    
+    # Export environment variable to trigger preloading of the patch
+    export PYTHONPATH="/tmp:$PYTHONPATH"
+    
+    # Create wrapper to apply patch at runtime
+    OFFLINE_WRAPPER_SCRIPT="/tmp/offline_wrapper.py"
+    cat > "$OFFLINE_WRAPPER_SCRIPT" << 'EOF'
+#!/usr/bin/env python
+# This is a wrapper script that applies offline mode patches before importing the real script
+
+import os
+import sys
+import importlib.util
+
+# Load the offline patch first
+patch_path = os.environ.get('TRANSFORMERS_OFFLINE_PATCH', '/tmp/transformers_offline_patch.py')
+try:
+    spec = importlib.util.spec_from_file_location("offline_patch", patch_path)
+    offline_patch = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(offline_patch)
+    print(f"Offline mode: Successfully loaded patch from {patch_path}")
+except Exception as e:
+    print(f"Offline mode: Warning - Failed to load patch from {patch_path}: {e}")
+
+# Get the original script to run
+if len(sys.argv) < 2:
+    print("Usage: offline_wrapper.py <script_to_run> [args...]")
+    sys.exit(1)
+
+script_path = sys.argv[1]
+sys.argv = sys.argv[1:]  # Shift arguments
+
+# Execute the target script
+try:
+    with open(script_path) as f:
+        exec(compile(f.read(), script_path, 'exec'))
+except Exception as e:
+    print(f"Error executing {script_path}: {e}")
+    sys.exit(1)
+EOF
+
+    chmod +x "$OFFLINE_WRAPPER_SCRIPT"
+    echo "Offline mode wrapper script created at $OFFLINE_WRAPPER_SCRIPT"
+fi
 
 # Apply the Adam optimizer patch directly before training
 echo "Applying Adam optimizer patch to fix weight_decay=None issue"
@@ -493,34 +698,66 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
         mkdir -p "$BASELINE_LOG_DIR"
         
         # Build commands for both models using our wrapper script
-        if [[ -f "$WRAP_SCRIPT" ]]; then
-            INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$WRAP_SCRIPT\" \
-                --config-file \"$CONFIG_FILE\" \
-                --data-dir \"$PREPROCESSED_DATA\" \
-                --gpu-id 0 \
-                --tensorboard-dir \"$INFINI_TB_DIR\""
-            
-            BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$WRAP_SCRIPT\" \
-                --config-file \"$CONFIG_FILE\" \
-                --data-dir \"$PREPROCESSED_DATA\" \
-                --gpu-id 0 \
-                --disable-infini-attn \
-                --tensorboard-dir \"$BASELINE_TB_DIR\""
+        if [[ "$OFFLINE_MODE" = true ]] && [[ -f "/tmp/offline_wrapper.py" ]]; then
+            # In offline mode, use the offline wrapper script
+            if [[ -f "$WRAP_SCRIPT" ]]; then
+                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$WRAP_SCRIPT\" \
+                    --config-file \"$CONFIG_FILE\" \
+                    --data-dir \"$PREPROCESSED_DATA\" \
+                    --gpu-id 0 \
+                    --tensorboard-dir \"$INFINI_TB_DIR\""
+                
+                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$WRAP_SCRIPT\" \
+                    --config-file \"$CONFIG_FILE\" \
+                    --data-dir \"$PREPROCESSED_DATA\" \
+                    --gpu-id 0 \
+                    --disable-infini-attn \
+                    --tensorboard-dir \"$BASELINE_TB_DIR\""
+            else
+                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                    --config-file \"$CONFIG_FILE\" \
+                    --data-dir \"$PREPROCESSED_DATA\" \
+                    --gpu-id 0 \
+                    --tensorboard-dir \"$INFINI_TB_DIR\""
+                
+                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"/tmp/offline_wrapper.py\" \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                    --config-file \"$CONFIG_FILE\" \
+                    --data-dir \"$PREPROCESSED_DATA\" \
+                    --gpu-id 0 \
+                    --disable-infini-attn \
+                    --tensorboard-dir \"$BASELINE_TB_DIR\""
+            }
         else
-            # Fallback to direct execution if wrapper script doesn't exist
-            echo "WARNING: Wrapper script not found, falling back to direct execution for parallel training"
-            INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
-                --config-file \"$CONFIG_FILE\" \
-                --data-dir \"$PREPROCESSED_DATA\" \
-                --gpu-id 0 \
-                --tensorboard-dir \"$INFINI_TB_DIR\""
-            
-            BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
-                --config-file \"$CONFIG_FILE\" \
-                --data-dir \"$PREPROCESSED_DATA\" \
-                --gpu-id 0 \
-                --disable-infini-attn \
-                --tensorboard-dir \"$BASELINE_TB_DIR\""
+            # Normal mode (online)
+            if [[ -f "$WRAP_SCRIPT" ]]; then
+                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$WRAP_SCRIPT\" \
+                    --config-file \"$CONFIG_FILE\" \
+                    --data-dir \"$PREPROCESSED_DATA\" \
+                    --gpu-id 0 \
+                    --tensorboard-dir \"$INFINI_TB_DIR\""
+                
+                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$WRAP_SCRIPT\" \
+                    --config-file \"$CONFIG_FILE\" \
+                    --data-dir \"$PREPROCESSED_DATA\" \
+                    --gpu-id 0 \
+                    --disable-infini-attn \
+                    --tensorboard-dir \"$BASELINE_TB_DIR\""
+            else
+                # Fallback to direct execution if wrapper script doesn't exist
+                echo "WARNING: Wrapper script not found, falling back to direct execution for parallel training"
+                INFINI_CMD="CUDA_VISIBLE_DEVICES=0 TRAINING_LOGS_DIR=$INFINI_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                    --config-file \"$CONFIG_FILE\" \
+                    --data-dir \"$PREPROCESSED_DATA\" \
+                    --gpu-id 0 \
+                    --tensorboard-dir \"$INFINI_TB_DIR\""
+                
+                BASELINE_CMD="CUDA_VISIBLE_DEVICES=1 TRAINING_LOGS_DIR=$BASELINE_LOG_DIR python \"$PROJECT_ROOT/scripts/run_direct_training.py\" \
+                    --config-file \"$CONFIG_FILE\" \
+                    --data-dir \"$PREPROCESSED_DATA\" \
+                    --gpu-id 0 \
+                    --disable-infini-attn \
+                    --tensorboard-dir \"$BASELINE_TB_DIR\""
+            fi
         fi
         
         # Add optional flags to both commands
@@ -532,6 +769,11 @@ if [[ "$RUN_BOTH_MODELS" = true ]]; then
         if [[ "$VERBOSE" = true ]]; then
             INFINI_CMD="$INFINI_CMD --verbose"
             BASELINE_CMD="$BASELINE_CMD --verbose"
+        fi
+
+        if [[ "$OFFLINE_MODE" = true ]]; then
+            INFINI_CMD="$INFINI_CMD --offline-mode"
+            BASELINE_CMD="$BASELINE_CMD --offline-mode"
         fi
         
         # Run both commands in parallel
