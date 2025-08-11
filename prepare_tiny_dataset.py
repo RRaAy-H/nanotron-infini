@@ -56,30 +56,92 @@ def prepare_dataset(data_dir, tokenizer_name="meta-llama/Llama-2-7b-hf", force=F
             print(f"Dataset loaded successfully: {type(dataset)}")
         except Exception as e:
             print(f"Could not load dataset from {data_path}: {e}")
-            print("Trying to check if there are parquet files...")
-            parquet_files = list(data_path.glob("*.parquet"))
-            if parquet_files:
-                print(f"Found {len(parquet_files)} parquet files.")
-                # Load the parquet files
-                dfs = []
-                for file in parquet_files:
+            print("Checking for Arrow files...")
+            arrow_files = list(data_path.glob("*.arrow"))
+            if arrow_files:
+                print(f"Found {len(arrow_files)} arrow files.")
+                try:
+                    # Try to load the Arrow files directly
+                    from datasets import load_dataset
+                    dataset = load_dataset("arrow", data_files=[str(f) for f in arrow_files])
+                    print(f"Successfully loaded Arrow files: {dataset}")
+                except Exception as arrow_e:
+                    print(f"Error loading Arrow files directly: {arrow_e}")
+                    # Try a different approach with pyarrow
                     try:
-                        df = pd.read_parquet(file)
-                        dfs.append(df)
-                    except Exception as e:
-                        print(f"Error loading {file}: {e}")
-                if dfs:
-                    # Concatenate the dataframes
-                    df = pd.concat(dfs)
-                    # Create a dataset
-                    dataset = Dataset.from_pandas(df)
-                    print(f"Created dataset from parquet files: {len(dataset)} examples")
-                else:
-                    print("No valid parquet files found.")
-                    return False
+                        import pyarrow as pa
+                        import pyarrow.parquet as pq
+                        dfs = []
+                        for file in arrow_files:
+                            try:
+                                # Read Arrow file
+                                reader = pa.ipc.open_file(file)
+                                table = reader.read_all()
+                                df = table.to_pandas()
+                                dfs.append(df)
+                            except Exception as e:
+                                print(f"Error loading {file}: {e}")
+                        
+                        if dfs:
+                            # Concatenate the dataframes
+                            df = pd.concat(dfs)
+                            # Create a dataset
+                            dataset = Dataset.from_pandas(df)
+                            print(f"Created dataset from Arrow files: {len(dataset)} examples")
+                        else:
+                            print("No valid Arrow files could be processed.")
+                            return False
+                    except ImportError:
+                        print("PyArrow not available. Trying parquet files instead...")
+                        # Fall back to parquet files
+                        parquet_files = list(data_path.glob("*.parquet"))
+                        if parquet_files:
+                            print(f"Found {len(parquet_files)} parquet files.")
+                            # Load the parquet files
+                            dfs = []
+                            for file in parquet_files:
+                                try:
+                                    df = pd.read_parquet(file)
+                                    dfs.append(df)
+                                except Exception as e:
+                                    print(f"Error loading {file}: {e}")
+                            if dfs:
+                                # Concatenate the dataframes
+                                df = pd.concat(dfs)
+                                # Create a dataset
+                                dataset = Dataset.from_pandas(df)
+                                print(f"Created dataset from parquet files: {len(dataset)} examples")
+                            else:
+                                print("No valid parquet files found.")
+                                return False
+                        else:
+                            print("No parquet files found.")
+                            return False
             else:
-                print("No parquet files found.")
-                return False
+                print("No Arrow files found. Checking for parquet files...")
+                parquet_files = list(data_path.glob("*.parquet"))
+                if parquet_files:
+                    print(f"Found {len(parquet_files)} parquet files.")
+                    # Load the parquet files
+                    dfs = []
+                    for file in parquet_files:
+                        try:
+                            df = pd.read_parquet(file)
+                            dfs.append(df)
+                        except Exception as e:
+                            print(f"Error loading {file}: {e}")
+                    if dfs:
+                        # Concatenate the dataframes
+                        df = pd.concat(dfs)
+                        # Create a dataset
+                        dataset = Dataset.from_pandas(df)
+                        print(f"Created dataset from parquet files: {len(dataset)} examples")
+                    else:
+                        print("No valid parquet files found.")
+                        return False
+                else:
+                    print("No Arrow or parquet files found.")
+                    return False
         
         # Check if this is a DatasetDict or a Dataset
         if isinstance(dataset, DatasetDict):
