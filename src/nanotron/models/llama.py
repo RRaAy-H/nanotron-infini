@@ -380,7 +380,7 @@ class CausalSelfAttention(nn.Module, AttachableStore):
             
             # Define a dummy FlashRotaryEmbedding class as fallback
             class FlashRotaryEmbedding:
-                def __init__(self, dim, interleaved=False, base=10000.0):
+                def __init__(self, dim, interleaved=False, base=10000.0, **kwargs):
                     self.dim = dim
                     self.interleaved = interleaved
                     self.base = base
