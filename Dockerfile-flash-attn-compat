@@ -1,0 +1,48 @@
+FROM nvidia/cuda:12.1.1-cudnn8-devel-ubuntu22.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PATH="/usr/local/cuda/bin:${PATH}"
+ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    wget \
+    build-essential \
+    python3-dev \
+    python3-pip \
+    ninja-build \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a symbolic link for python
+RUN ln -sf /usr/bin/python3 /usr/bin/python
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# Install PyTorch and other dependencies
+RUN pip install --no-cache-dir torch==2.0.1 torchvision==0.15.2 torchaudio==2.0.2 --extra-index-url https://download.pytorch.org/whl/cu118
+
+# Install Flash Attention dependencies and build from source
+RUN pip install --no-cache-dir packaging wheel
+RUN pip install --no-cache-dir ninja
+
+# Clone and install Flash Attention
+RUN git clone https://github.com/Dao-AILab/flash-attention.git /flash-attention \
+    && cd /flash-attention \
+    && git checkout v2.3.3 \
+    && pip install --no-cache-dir . \
+    && cd csrc/layer_norm && pip install --no-cache-dir . \
+    && cd ../rotary && pip install --no-cache-dir .
+
+# Create a workspace directory
+WORKDIR /workspace
+
+# Copy the scripts to check Flash Attention compatibility
+COPY scripts/flash_attention_compatibility.py /workspace/
+COPY scripts/fix_flash_attention_glibc.py /workspace/
+
+CMD ["bash"]
