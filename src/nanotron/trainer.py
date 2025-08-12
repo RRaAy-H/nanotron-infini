@@ -502,6 +502,30 @@ class DistributedTrainer:
                         for key, value in flat_logs.items():
                             if isinstance(value, (int, float)):
                                 self.tensorboard_writer.add_scalar(f"debug/{key}", value, self.iteration_step)
+                        
+                        # Log balance_factors monitoring
+                        if hasattr(self.model, 'module'):
+                            model = self.model.module
+                        else:
+                            model = self.model
+                        
+                        # Find and log balance_factors from all attention layers
+                        for name, module in model.named_modules():
+                            if hasattr(module, 'balance_factors'):
+                                balance_values = module.balance_factors.detach().cpu()
+                                # Log histogram of balance factors
+                                self.tensorboard_writer.add_histogram(f"balance_factors/{name}", balance_values, self.iteration_step)
+                                # Log statistics
+                                self.tensorboard_writer.add_scalar(f"balance_factors/{name}/mean", balance_values.mean().item(), self.iteration_step)
+                                self.tensorboard_writer.add_scalar(f"balance_factors/{name}/std", balance_values.std().item(), self.iteration_step)
+                                self.tensorboard_writer.add_scalar(f"balance_factors/{name}/min", balance_values.min().item(), self.iteration_step)
+                                self.tensorboard_writer.add_scalar(f"balance_factors/{name}/max", balance_values.max().item(), self.iteration_step)
+                                
+                                # Log activated balance factors (after sigmoid/tanh)
+                                if hasattr(module, 'balance_act_func'):
+                                    activated_values = module.balance_act_func(balance_values)
+                                    self.tensorboard_writer.add_histogram(f"balance_factors/{name}/activated", activated_values, self.iteration_step)
+                                    self.tensorboard_writer.add_scalar(f"balance_factors/{name}/activated_mean", activated_values.mean().item(), self.iteration_step)
 
                     for handle in nn_handles:
                         handle.remove()

@@ -12,9 +12,9 @@ general:
 
 # Infini-Attention Configuration - Updated to match reference specs
 infini_attention:
-  segment_length: 2048
+  segment_length: 1024
   turn_on_memory: true
-  balance_factor_lr: 0.00015
+  balance_factor_lr: 0.01
   balance_act_type: hard_sigmoid
   balance_init_type: zeros
   logging: true
