@@ -1,30 +1,16 @@
-# Baseline Llama Configuration (Standard Attention)
-# Identical setup to fineweb_local_300m_infini_4gpu_config.yaml but with Infini-Attention disabled
-# For fair comparison with the Infini-Attention implementation
+# Multi-GPU Configuration for 4x RTX 4090 with Llama 200M (Standard Attention)
+# Optimized for maximum memory utilization on 4x 24GB GPUs
 
 general:
   benchmark_csv_path: null
   consumed_train_samples: null
   ignore_sanity_checks: false
-  project: llama_300m_baseline_4gpu_fineweb
-  run: 4gpu_fineweb_300m_baseline_experiment
+  project: llama_200m_standard_4gpu_fineweb_test
+  run: 4gpu_fineweb_standard_experiment
   seed: 42
   step: null
 
-# Infini-Attention Configuration (Disabled for Baseline)
-infini_attention:
-  segment_length: 2048                  # Same as Infini-Attention config
-  turn_on_memory: false                 # DISABLE Infini-Attention memory
-  balance_factor_lr: 0.00015           # Keep settings identical (not used when memory is off)
-  balance_act_type: hard_sigmoid       # Keep settings identical (not used when memory is off)
-  balance_init_type: zeros             # Keep settings identical (not used when memory is off)
-  logging: true                        # Enable detailed logging for comparison
-  logging_interval: 1000               # Match Infini-Attention config
-  log_grad: false                     # Match Infini-Attention config
-  log_segment_acts: false             # Match Infini-Attention config
-  balance_factor_weight_decay: 0.0    # Match Infini-Attention config
-
-# Model Configuration (300M Parameters - Identical to Infini-Attention Setup)
+# Model Configuration (200M parameters) - Standard Attention
 model:
   ddp_bucket_cap_mb: 25
   dtype: bfloat16
@@ -38,9 +24,9 @@ model:
     initializer_range: 0.02
     hidden_size: 1024
     intermediate_size: 4096
-    num_hidden_layers: 12
+    num_hidden_layers: 6
     is_llama_config: true
-    max_position_embeddings: 32768  # Updated for long context
+    max_position_embeddings: 512  # Same as Infini version
     num_attention_heads: 8
     num_key_value_heads: 8
     pad_token_id: null
@@ -51,7 +37,7 @@ model:
     use_cache: true
     vocab_size: 49152
 
-# Optimizer Configuration - Adjusted for larger model and batch size
+# Optimizer Configuration - Same as Infini version
 optimizer:
   accumulate_grad_in_fp32: true
   adam_beta1: 0.9
@@ -60,17 +46,17 @@ optimizer:
   torch_adam_is_fused: false
   clip_grad: 1.0
   learning_rate_scheduler:
-    learning_rate: 0.00006  # Reduced for larger model and long sequences
+    learning_rate: 0.00012  # Same as Infini version
     lr_decay_starting_step: null
     lr_decay_steps: null
     lr_decay_style: cosine
-    lr_warmup_steps: 500  
+    lr_warmup_steps: 20  
     lr_warmup_style: linear
-    min_decay_lr: 0.000006
+    min_decay_lr: 0.000012
   weight_decay: 0.1
   zero_stage: 0
 
-# Parallelism Configuration - 4x GPUs with data parallelism
+# Parallelism Configuration - Same as Infini version
 parallelism:
   dp: 4  # Data parallel across 4 GPUs
   tp: 1  # No tensor parallelism
@@ -80,25 +66,25 @@ parallelism:
   tp_linear_async_communication: false
   tp_mode: ALL_REDUCE
 
-# Tokenizer Configuration
+# Tokenizer Configuration - Same as Infini version
 tokenizer:
   tokenizer_max_length: null
   tokenizer_name_or_path: lvwerra/the-tokenizer-v1
   tokenizer_revision: null
 
-# Training Tokens Configuration - Adjusted for long sequences
+# Training Tokens Configuration - Same as Infini version
 tokens:
   batch_accumulation_per_replica: 1
   limit_test_batches: 0
   limit_val_batches: 0
-  micro_batch_size: 1  # Reduced due to very long sequences (32768)
-  sequence_length: 8192  # Full reference sequence length
-  train_steps: 10000  # Reduced for initial testing
+  micro_batch_size: 12  # Same as Infini version
+  sequence_length: 512  # Same as Infini version
+  train_steps: 200  # Same number of steps
   val_check_interval: -1
 
-# Data Configuration for Local FineWeb Dataset
+# Data Configuration - Same as Infini version
 data_stages:
-  - name: "4GPU FineWeb 300M Baseline Stage"
+  - name: "4GPU FineWeb Standard Test Stage"
     start_training_step: 1
     data:
       dataset:
@@ -112,28 +98,19 @@ data_stages:
       num_loading_workers: 4
       seed: 42
 
-# Checkpoints Configuration
+# Checkpoints Configuration - Different path to avoid conflicts
 checkpoints:
-  checkpoint_interval: 1000  
-  checkpoints_path: ./checkpoints/fineweb_4gpu_300m_baseline
+  checkpoint_interval: 50  
+  checkpoints_path: ./checkpoints/fineweb_4gpu_200m_standard_test
   checkpoints_path_is_shared_file_system: false
   resume_checkpoint_path: null
   save_initial_state: true
 
-# Logging Configuration
+# Logging Configuration - Same as Infini version
 logging:
-  iteration_step_info_interval: 50  
+  iteration_step_info_interval: 10  
   log_level: info
   log_level_replica: info
 
 # Profiler (disabled for simplicity)
 profiler: null
-
-# Experiment Logger (Optional - requires setup)
-experiment_logger:
-  tensorboard_logger:
-    flush_secs: 30
-    tensorboard_dir: ./tensorboard_logs/fineweb_4gpu_300m_baseline
-  # wandb_logger:  # Uncomment if you have wandb setup
-  #   wandb_entity: null
-  #   wandb_project: llama_300m_baseline_4gpu_fineweb
