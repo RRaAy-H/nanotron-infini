@@ -25,6 +25,6 @@ TRAINING_CONFIG = None
 
 DEBUG_PATH = "./debug/nn_states_with_bs_2_and_transpose_qkv/acts/"
 
-MONITOR_STATE_PATH = "/fsx/phuc/projects/nanotron/debug/runs"
+MONITOR_STATE_PATH = "./debug/runs"
 
 BALANCE_FACTOR_STD = {}
