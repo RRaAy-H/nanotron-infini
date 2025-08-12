@@ -327,7 +327,7 @@ class DistributedTrainer:
             tb_log_dir = f"./tensorboard_logs/{self.config.general.project}/{self.config.general.run}"
             os.makedirs(tb_log_dir, exist_ok=True)
             self.tensorboard_writer = SummaryWriter(log_dir=tb_log_dir)
-            logger.info(f"TensorBoard logging enabled. Run: tensorboard --logdir ./tensorboard_logs", group=self.parallel_context.world_pg, rank=0)
+            log_rank(f"TensorBoard logging enabled. Run: tensorboard --logdir ./tensorboard_logs", logger=logger, level=logging.INFO, rank=0, group=self.parallel_context.world_pg)
         
         # Keep wandb disabled
         # if dist.get_rank(self.parallel_context.world_pg) == self.logger_ranks[0] and wandb is not None:
