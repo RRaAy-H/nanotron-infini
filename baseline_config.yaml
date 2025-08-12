@@ -123,7 +123,9 @@ logging:
   iteration_step_info_interval: 10  
   log_level: info
   log_level_replica: info
-  log_dir: ./logs/baseline_run
+  tensorboard_logger:
+    tensorboard_dir: ./logs/tensorboard/baseline_run
+    flush_secs: 30
 
 # Profiler (disabled for simplicity)
 profiler: null
