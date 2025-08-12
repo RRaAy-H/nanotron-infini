@@ -123,9 +123,7 @@ logging:
   iteration_step_info_interval: 10  
   log_level: info
   log_level_replica: info
-  tensorboard_logger:
-    tensorboard_dir: ./logs/tensorboard/baseline_run
-    flush_secs: 30
+  log_dir: ./logs/baseline_run  # This might be the correct format depending on your nanotron version
 
 # Profiler (disabled for simplicity)
 profiler: null
