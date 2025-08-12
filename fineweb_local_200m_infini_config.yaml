@@ -21,6 +21,7 @@ infini_attention:
   logging_interval: 1000
   log_grad: false
   log_segment_acts: false
+  balance_factor_weight_decay: 0.0
 
 # Model Configuration (200M parameters)
 model:
@@ -55,7 +56,7 @@ optimizer:
   adam_beta1: 0.9
   adam_beta2: 0.95
   adam_eps: 1.0e-08
-  torch_adam_is_fused: true
+  torch_adam_is_fused: false
   clip_grad: 1.0
   learning_rate_scheduler:
     learning_rate: 0.0000375
