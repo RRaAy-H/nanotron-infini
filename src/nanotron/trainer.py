@@ -509,23 +509,48 @@ class DistributedTrainer:
                         else:
                             model = self.model
                         
-                        # Find and log balance_factors from all attention layers
+                        # Collect balance_factors from all attention layers
+                        all_balance_values = []
+                        all_activated_values = []
+                        layer_wise_means = []
+                        layer_wise_activated_means = []
+                        
                         for name, module in model.named_modules():
                             if hasattr(module, 'balance_factors'):
                                 balance_values = module.balance_factors.detach().cpu()
-                                # Log histogram of balance factors
-                                self.tensorboard_writer.add_histogram(f"balance_factors/{name}", balance_values, self.iteration_step)
-                                # Log statistics
-                                self.tensorboard_writer.add_scalar(f"balance_factors/{name}/mean", balance_values.mean().item(), self.iteration_step)
-                                self.tensorboard_writer.add_scalar(f"balance_factors/{name}/std", balance_values.std().item(), self.iteration_step)
-                                self.tensorboard_writer.add_scalar(f"balance_factors/{name}/min", balance_values.min().item(), self.iteration_step)
-                                self.tensorboard_writer.add_scalar(f"balance_factors/{name}/max", balance_values.max().item(), self.iteration_step)
+                                all_balance_values.append(balance_values)
+                                layer_wise_means.append(balance_values.mean().item())
                                 
-                                # Log activated balance factors (after sigmoid/tanh)
+                                # Get activated balance factors (after sigmoid/tanh)
                                 if hasattr(module, 'balance_act_func'):
                                     activated_values = module.balance_act_func(balance_values)
-                                    self.tensorboard_writer.add_histogram(f"balance_factors/{name}/activated", activated_values, self.iteration_step)
-                                    self.tensorboard_writer.add_scalar(f"balance_factors/{name}/activated_mean", activated_values.mean().item(), self.iteration_step)
+                                    all_activated_values.append(activated_values)
+                                    layer_wise_activated_means.append(activated_values.mean().item())
+                        
+                        # Log aggregated statistics across all layers
+                        if all_balance_values:
+                            # Concatenate all balance factors
+                            all_balance_tensor = torch.cat(all_balance_values)
+                            
+                            # Log global statistics for raw balance factors
+                            self.tensorboard_writer.add_scalar("balance_factors/global_mean", all_balance_tensor.mean().item(), self.iteration_step)
+                            self.tensorboard_writer.add_scalar("balance_factors/global_std", all_balance_tensor.std().item(), self.iteration_step)
+                            
+                            # Log layer-wise mean statistics
+                            layer_means_tensor = torch.tensor(layer_wise_means)
+                            self.tensorboard_writer.add_scalar("balance_factors/layer_mean_avg", layer_means_tensor.mean().item(), self.iteration_step)
+                            self.tensorboard_writer.add_scalar("balance_factors/layer_mean_std", layer_means_tensor.std().item(), self.iteration_step)
+                            
+                            # Log activated values if available
+                            if all_activated_values:
+                                all_activated_tensor = torch.cat(all_activated_values)
+                                self.tensorboard_writer.add_scalar("balance_factors/activated_global_mean", all_activated_tensor.mean().item(), self.iteration_step)
+                                self.tensorboard_writer.add_scalar("balance_factors/activated_global_std", all_activated_tensor.std().item(), self.iteration_step)
+                                
+                                # Log layer-wise activated mean statistics
+                                layer_activated_means_tensor = torch.tensor(layer_wise_activated_means)
+                                self.tensorboard_writer.add_scalar("balance_factors/activated_layer_mean_avg", layer_activated_means_tensor.mean().item(), self.iteration_step)
+                                self.tensorboard_writer.add_scalar("balance_factors/activated_layer_mean_std", layer_activated_means_tensor.std().item(), self.iteration_step)
 
                     for handle in nn_handles:
                         handle.remove()

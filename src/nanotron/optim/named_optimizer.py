@@ -54,7 +54,7 @@ class NamedOptimizer(InheritFromOtherOptimizer):
         # if constants.CONFIG.infini_attention.balance_factor_weight_decay is not None:
         for param_group in params:
             for param in param_group["params"]:
-                if "balance_factor" in id_to_name[id(param)]:
+                if "balance_factors" in id_to_name[id(param)]:
                     param_group["weight_decay"] = constants.CONFIG.infini_attention.balance_factor_weight_decay
                 else:
                     param_group["weight_decay"] = constants.CONFIG.optimizer.weight_decay
