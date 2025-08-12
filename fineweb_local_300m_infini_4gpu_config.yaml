@@ -67,12 +67,12 @@ optimizer:
     lr_warmup_style: linear
     min_decay_lr: 0.000006
   weight_decay: 0.1
-  zero_stage: 0
+  zero_stage: 1  # Enable ZeRO stage 1 to reduce memory
 
 # Parallelism Configuration - 4x GPUs with data parallelism
 parallelism:
-  dp: 4  # Data parallel across 4 GPUs
-  tp: 1  # No tensor parallelism
+  dp: 2  # Reduce DP to enable TP
+  tp: 2  # Enable tensor parallelism to split model across GPUs
   expert_parallel_size: 1
   pp: 1  # No pipeline parallelism
   pp_engine: 1f1b
@@ -87,10 +87,10 @@ tokenizer:
 
 # Training Tokens Configuration - Adjusted for long sequences
 tokens:
-  batch_accumulation_per_replica: 1
+  batch_accumulation_per_replica: 4  # Use gradient accumulation instead of larger batch
   limit_test_batches: 0
   limit_val_batches: 0
-  micro_batch_size: 1  # Reduced due to very long sequences (32768)
+  micro_batch_size: 1  # Keep at 1 for 32K sequences
   sequence_length: 32768  # Full reference sequence length
   train_steps: 10000  # Reduced for initial testing
   val_check_interval: -1
