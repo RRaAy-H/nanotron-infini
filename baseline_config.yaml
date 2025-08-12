@@ -10,6 +10,19 @@ general:
   seed: 42
   step: null
 
+# Infini-Attention Configuration - DISABLED for baseline
+infini_attention:
+  segment_length: 64
+  turn_on_memory: false  # This disables Infini-Attention
+  balance_factor_lr: 0.00015
+  balance_act_type: hard_sigmoid
+  balance_init_type: zeros
+  logging: false
+  logging_interval: 1000
+  log_grad: false
+  log_segment_acts: false
+  balance_factor_weight_decay: 0.0
+
 # Model Configuration (200M parameters) - Standard Attention
 model:
   ddp_bucket_cap_mb: 25
