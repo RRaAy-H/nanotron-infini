@@ -1,10 +1,8 @@
 #!/bin/bash
-
 export MASTER_ADDR=localhost
-export MASTER_PORT=29502
+export MASTER_PORT=29503
 export CUDA_VISIBLE_DEVICES=0,1,2,3
 
-echo "Starting 4-GPU distributed training with fineweb data:"
 echo "MASTER_ADDR=$MASTER_ADDR"
 echo "MASTER_PORT=$MASTER_PORT" 
 echo "CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES"
@@ -15,4 +13,4 @@ torchrun \
     --nproc_per_node=4 \
     --master_addr=$MASTER_ADDR \
     --master_port=$MASTER_PORT \
-    run_train.py --config-file fineweb_local_200m_infini_4gpu_config.yaml
+    run_train.py --config-file fineweb_local_300m_infini_4gpu_config.yaml
