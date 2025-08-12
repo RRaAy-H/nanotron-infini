@@ -15,4 +15,4 @@ torchrun \
     --nproc_per_node=4 \
     --master_addr=$MASTER_ADDR \
     --master_port=$MASTER_PORT \
-    run_train.py --config-file fineweb_local_200m_standard_4gpu_config.yaml
+    run_train.py --config-file baseline_config.yaml
