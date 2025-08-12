@@ -47,7 +47,7 @@ model:
     rope_scaling: null
     tie_word_embeddings: false
     use_cache: true
-    vocab_size: 1024  # Power of 2 for better alignment
+    vocab_size: 50304  # Match GPT-2 tokenizer size (50257 rounded up to multiple of 64)
 
 # Optimizer Configuration (faster convergence for testing)
 optimizer:
@@ -89,7 +89,7 @@ tokens:
   batch_accumulation_per_replica: 1
   limit_test_batches: 0
   limit_val_batches: 0
-  micro_batch_size: 2  # Very small batch for testing
+  micro_batch_size: 4  # Slightly larger batch for flash attention compatibility
   sequence_length: 128  # Power of 2 aligned for kernels
   train_steps: 20      # Very few steps for quick testing
   val_check_interval: -1

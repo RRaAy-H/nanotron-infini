@@ -8,7 +8,7 @@ echo "=========================================="
 echo "Starting Tiny Dataset Training Test"
 echo "=========================================="
 echo "This will:"
-echo "- Use a very small model (64 hidden size, 2 layers)"
+echo "- Use a small model (256 hidden size, 2 layers, ~26M params)"
 echo "- Train for only 20 steps"
 echo "- Use a tiny test dataset"
 echo "- Test the complete training pipeline"
@@ -23,6 +23,7 @@ export LOCAL_RANK=0
 
 # Set CUDA connections (important for distributed operations)
 export CUDA_DEVICE_MAX_CONNECTIONS=1
+export TOKENIZERS_PARALLELISM=false
 
 echo "Environment setup:"
 echo "MASTER_ADDR=$MASTER_ADDR"
