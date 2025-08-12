@@ -12,7 +12,7 @@ general:
 
 # Infini-Attention Configuration (minimal for testing)
 infini_attention:
-  segment_length: 16  # Very small for testing
+  segment_length: 32  # Adjusted for model size
   turn_on_memory: true
   balance_factor_lr: 0.001  # Higher for faster convergence in testing
   balance_act_type: hard_sigmoid
@@ -34,13 +34,13 @@ model:
     eos_token_id: 2
     hidden_act: silu
     initializer_range: 0.02
-    hidden_size: 64    # Very small for fast testing
-    intermediate_size: 128  # Very small
+    hidden_size: 128    # Minimum size for flash attention
+    intermediate_size: 256  # Proportionally sized
     num_hidden_layers: 2   # Minimal layers
     is_llama_config: true
     max_position_embeddings: 128  # Small context for testing
-    num_attention_heads: 2  # Minimal heads
-    num_key_value_heads: 2
+    num_attention_heads: 4  # Must divide hidden_size evenly
+    num_key_value_heads: 4
     pad_token_id: null
     pretraining_tp: 1
     rms_norm_eps: 1.0e-05
