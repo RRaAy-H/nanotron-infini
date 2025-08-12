@@ -187,7 +187,7 @@ class RotaryEmbedding(nn.Module):
     def forward(
         self,
         x: torch.Tensor,  # [batch_size, seq_len, num_heads, d_qk]
-        position_ids: Optional[torch.LongTensor],  # [batch_size, seq_len]
+        position_ids: Optional[torch.LongTensor],  # [batch_size, seq_length]
     ):
         batch_size, seq_len, num_heads, inner_dim = x.shape
         while (
@@ -485,53 +485,59 @@ class CausalSelfAttention(nn.Module, AttachableStore):
 
         device = self.o_proj.weight.device
 
-        from nanotron.parallel.sharded_parameters import SplitConfig, create_sharded_parameter_from_config
+        # Only create balance_factors if Infini-Attention is enabled
+        if constants.CONFIG.infini_attention.turn_on_memory:
+            from nanotron.parallel.sharded_parameters import SplitConfig, create_sharded_parameter_from_config
 
-        if constants.CONFIG.infini_attention.balance_init_type == "zeros":
-            log_rank("Zero initialized balance factors", logger=logger, level=logging.WARNING, rank=0)
-            balance_factors = nn.Parameter(torch.zeros(self.n_local_q_heads, device=device, dtype=torch.float32))
-        elif constants.CONFIG.infini_attention.balance_init_type == "randn":
-            log_rank("randn initialized balance factors", logger=logger, level=logging.WARNING, rank=0)
-            balance_factors = nn.Parameter(torch.randn(self.n_local_q_heads, device=device, dtype=torch.float32))
+            if constants.CONFIG.infini_attention.balance_init_type == "zeros":
+                log_rank("Zero initialized balance factors", logger=logger, level=logging.WARNING, rank=0)
+                balance_factors = nn.Parameter(torch.zeros(self.n_local_q_heads, device=device, dtype=torch.float32))
+            elif constants.CONFIG.infini_attention.balance_init_type == "randn":
+                log_rank("randn initialized balance factors", logger=logger, level=logging.WARNING, rank=0)
+                balance_factors = nn.Parameter(torch.randn(self.n_local_q_heads, device=device, dtype=torch.float32))
+            else:
+                raise ValueError(f"balance_init_type {constants.CONFIG.infini_attention.balance_init_type} not supported")
+
+            self.balance_factors = create_sharded_parameter_from_config(
+                parameter=balance_factors,
+                pg=tp_pg,
+                split_config=SplitConfig(
+                    split_dim=0,
+                    # contiguous_chunks=(self.n_local_heads, self.n_local_heads)
+                ),
+            )
+
+            if constants.CONFIG.infini_attention.balance_act_type == "orig_sigmoid":
+                balance_act_func = F.sigmoid
+            elif constants.CONFIG.infini_attention.balance_act_type == "orig_tanh":
+                balance_act_func = F.tanh
+            elif constants.CONFIG.infini_attention.balance_act_type == "hard_sigmoid":
+
+                def hard_sigmoid(x):
+                    return torch.clamp(x * 0.2 + 0.5, min=0.0, max=1.0)
+
+                balance_act_func = hard_sigmoid
+            elif constants.CONFIG.infini_attention.balance_act_type == "tanh_abs":
+
+                def tanh_abs(x):
+                    return torch.tanh(x).abs()
+
+                balance_act_func = tanh_abs
+            else:
+                raise ValueError(f"balance_act_type {constants.CONFIG.infini_attention.balance_act_type} not supported")
+
+            log_rank(
+                f"Balance act func is {balance_act_func}",
+                logger=logger,
+                level=logging.WARNING,
+                rank=0,
+            )
+
+            self.balance_act_func = balance_act_func
         else:
-            raise ValueError(f"balance_init_type {constants.CONFIG.infini_attention.balance_init_type} not supported")
-
-        self.balance_factors = create_sharded_parameter_from_config(
-            parameter=balance_factors,
-            pg=tp_pg,
-            split_config=SplitConfig(
-                split_dim=0,
-                # contiguous_chunks=(self.n_local_heads, self.n_local_heads)
-            ),
-        )
-
-        if constants.CONFIG.infini_attention.balance_act_type == "orig_sigmoid":
-            balance_act_func = F.sigmoid
-        elif constants.CONFIG.infini_attention.balance_act_type == "orig_tanh":
-            balance_act_func = F.tanh
-        elif constants.CONFIG.infini_attention.balance_act_type == "hard_sigmoid":
-
-            def hard_sigmoid(x):
-                return torch.clamp(x * 0.2 + 0.5, min=0.0, max=1.0)
-
-            balance_act_func = hard_sigmoid
-        elif constants.CONFIG.infini_attention.balance_act_type == "tanh_abs":
-
-            def tanh_abs(x):
-                return torch.tanh(x).abs()
-
-            balance_act_func = tanh_abs
-        else:
-            raise ValueError(f"balance_act_type {constants.CONFIG.infini_attention.balance_act_type} not supported")
-
-        log_rank(
-            f"Balance act func is {balance_act_func}",
-            logger=logger,
-            level=logging.WARNING,
-            rank=0,
-        )
-
-        self.balance_act_func = balance_act_func
+            # When Infini-Attention is disabled, set balance_factors to None
+            self.balance_factors = None
+            self.balance_act_func = None
 
         log_rank(
             f"Segment length is {self.segment_length}, turn_on_memory: {constants.CONFIG.infini_attention.turn_on_memory is True}",
@@ -570,9 +576,15 @@ class CausalSelfAttention(nn.Module, AttachableStore):
         normalization = None
 
         outputs = []
-        global_weights = self.balance_act_func(self.balance_factors)
-        global_weights = rearrange(global_weights, "n_heads -> 1 n_heads 1 1")
-        local_weights = 1 - global_weights
+
+        # Only compute balance weights if Infini-Attention is enabled
+        if constants.CONFIG.infini_attention.turn_on_memory and self.balance_factors is not None:
+            global_weights = self.balance_act_func(self.balance_factors)
+            global_weights = rearrange(global_weights, "n_heads -> 1 n_heads 1 1")
+            local_weights = 1 - global_weights
+        else:
+            global_weights = None
+            local_weights = None
 
         for segment_hidden_state, segment_sequence_mask in zip(segment_hidden_states, segment_sequence_masks):
             attn_outputs = self.forward_with_hidden_states(

@@ -1,5 +1,4 @@
 # Multi-GPU Configuration for 4x RTX 4090 with Llama 200M (Standard Attention)
-# Optimized for maximum memory utilization on 4x 24GB GPUs
 
 general:
   benchmark_csv_path: null
@@ -39,7 +38,7 @@ model:
     intermediate_size: 4096
     num_hidden_layers: 6
     is_llama_config: true
-    max_position_embeddings: 512  # Same as Infini version
+    max_position_embeddings: 512
     num_attention_heads: 8
     num_key_value_heads: 8
     pad_token_id: null
@@ -50,7 +49,7 @@ model:
     use_cache: true
     vocab_size: 49152
 
-# Optimizer Configuration - Same as Infini version
+# Optimizer Configuration
 optimizer:
   accumulate_grad_in_fp32: true
   adam_beta1: 0.9
@@ -59,7 +58,7 @@ optimizer:
   torch_adam_is_fused: false
   clip_grad: 1.0
   learning_rate_scheduler:
-    learning_rate: 0.00012  # Same as Infini version
+    learning_rate: 0.00012
     lr_decay_starting_step: null
     lr_decay_steps: null
     lr_decay_style: cosine
@@ -69,7 +68,7 @@ optimizer:
   weight_decay: 0.1
   zero_stage: 0
 
-# Parallelism Configuration - Same as Infini version
+# Parallelism Configuration
 parallelism:
   dp: 4  # Data parallel across 4 GPUs
   tp: 1  # No tensor parallelism
@@ -79,23 +78,23 @@ parallelism:
   tp_linear_async_communication: false
   tp_mode: ALL_REDUCE
 
-# Tokenizer Configuration - Same as Infini version
+# Tokenizer Configuration
 tokenizer:
   tokenizer_max_length: null
   tokenizer_name_or_path: lvwerra/the-tokenizer-v1
   tokenizer_revision: null
 
-# Training Tokens Configuration - Same as Infini version
+# Training Tokens Configuration
 tokens:
   batch_accumulation_per_replica: 1
   limit_test_batches: 0
   limit_val_batches: 0
-  micro_batch_size: 12  # Same as Infini version
-  sequence_length: 512  # Same as Infini version
-  train_steps: 200  # Same number of steps
+  micro_batch_size: 12
+  sequence_length: 512
+  train_steps: 200
   val_check_interval: -1
 
-# Data Configuration - Same as Infini version
+# Data Configuration
 data_stages:
   - name: "4GPU FineWeb Standard Test Stage"
     start_training_step: 1
@@ -111,7 +110,7 @@ data_stages:
       num_loading_workers: 4
       seed: 42
 
-# Checkpoints Configuration - Different path to avoid conflicts
+# Checkpoints Configuration
 checkpoints:
   checkpoint_interval: 50  
   checkpoints_path: ./checkpoints/fineweb_4gpu_200m_standard_test
@@ -119,7 +118,7 @@ checkpoints:
   resume_checkpoint_path: null
   save_initial_state: true
 
-# Logging Configuration - Same as Infini version
+# Logging Configuration
 logging:
   iteration_step_info_interval: 10  
   log_level: info
