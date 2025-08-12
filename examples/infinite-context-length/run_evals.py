@@ -13,7 +13,7 @@ import os
 from pathlib import Path
 
 import torch
-from nanotron import constants, distributed as dist
+from nanotron import distributed as dist
 from nanotron import logging
 from nanotron.config import (
     GenerationArgs,
@@ -2251,6 +2251,8 @@ def main():
     assert args.ckpt_path.exists(), f"Checkpoint path {args.ckpt_path} does not exist"
 
     config = get_config_from_file((args.ckpt_path / "config.yaml").as_posix())
+    from nanotron import constants
+    
     constants.CONFIG = config
     model_config = config.model.model_config
     tokenizer_path = config.tokenizer.tokenizer_name_or_path
