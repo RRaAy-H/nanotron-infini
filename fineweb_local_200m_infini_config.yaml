@@ -116,7 +116,7 @@ checkpoints:
   checkpoints_path: ./checkpoints/fineweb_local_200m_infini
   checkpoints_path_is_shared_file_system: false
   resume_checkpoint_path: null
-  save_initial_state: false
+  save_initial_state: true
 
 # Logging Configuration
 logging:

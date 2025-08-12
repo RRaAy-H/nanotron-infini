@@ -107,6 +107,12 @@ try:
 except ImportError:
     wandb = None
 
+try:
+    from torch.utils.tensorboard import SummaryWriter
+    tensorboard_available = True
+except ImportError:
+    tensorboard_available = False
+
 
 class DistributedTrainer:
     def __init__(
@@ -313,20 +319,34 @@ class DistributedTrainer:
         )
 
         datetime.datetime.now().strftime("%d/%m/%Y_%H:%M:%S")
-        if dist.get_rank(self.parallel_context.world_pg) == self.logger_ranks[0] and wandb is not None:
-            wandb.init(
-                project=self.config.general.project,
-                # name=f"{current_time}_{self.config.general.run}",
-                name=f"{self.config.general.run}",
-                config={"nanotron_config": self.config.as_dict()},
-            )
-            # wandb.watch(self.model, log="all")
+        
+        # Initialize TensorBoard instead of wandb
+        self.tensorboard_writer = None
+        if dist.get_rank(self.parallel_context.world_pg) == self.logger_ranks[0] and tensorboard_available:
+            import os
+            tb_log_dir = f"./tensorboard_logs/{self.config.general.project}/{self.config.general.run}"
+            os.makedirs(tb_log_dir, exist_ok=True)
+            self.tensorboard_writer = SummaryWriter(log_dir=tb_log_dir)
+            logger.info(f"TensorBoard logging enabled. Run: tensorboard --logdir ./tensorboard_logs", group=self.parallel_context.world_pg, rank=0)
+        
+        # Keep wandb disabled
+        # if dist.get_rank(self.parallel_context.world_pg) == self.logger_ranks[0] and wandb is not None:
+        #     wandb.init(
+        #         project=self.config.general.project,
+        #         # name=f"{current_time}_{self.config.general.run}",
+        #         name=f"{self.config.general.run}",
+        #         config={"nanotron_config": self.config.as_dict()},
+        #     )
+        #     # wandb.watch(self.model, log="all")
 
     def post_train_step(self):
         pass
 
     def post_training(self):
-        pass
+        # Close TensorBoard writer
+        if self.tensorboard_writer is not None:
+            self.tensorboard_writer.close()
+            print("TensorBoard logging closed.")
 
     def _print_training_plan(self):
         if hasattr(self.config, "data_stages") and self.config.data_stages is not None:
@@ -476,8 +496,12 @@ class DistributedTrainer:
                 ):
                     from nanotron.debug.monitor import convert_logs_to_flat_logs
 
-                    if dist.get_rank(self.parallel_context.world_pg) == self.logger_ranks[0] and wandb is not None:
-                        wandb.log({**convert_logs_to_flat_logs(nn_logs), "iteration_step": self.iteration_step})
+                    # Log to TensorBoard instead of wandb
+                    if self.tensorboard_writer is not None:
+                        flat_logs = convert_logs_to_flat_logs(nn_logs)
+                        for key, value in flat_logs.items():
+                            if isinstance(value, (int, float)):
+                                self.tensorboard_writer.add_scalar(f"debug/{key}", value, self.iteration_step)
 
                     for handle in nn_handles:
                         handle.remove()
@@ -655,14 +679,11 @@ class DistributedTrainer:
                     ]
                 )
 
-            # NOTE: only one rank writes to wandb
-            if dist.get_rank(self.parallel_context.world_pg) == self.logger_ranks[0] and wandb is not None:
-                wandb.log(
-                    {
-                        **{log_item.tag: log_item.scalar_value for log_item in log_entries},
-                        "iteration_step": self.iteration_step,
-                    }
-                )
+            # NOTE: only one rank writes to TensorBoard
+            if self.tensorboard_writer is not None:
+                for log_item in log_entries:
+                    self.tensorboard_writer.add_scalar(log_item.tag, log_item.scalar_value, self.iteration_step)
+                self.tensorboard_writer.flush()
 
             self.loggerwriter.add_scalars_from_list(log_entries, self.iteration_step)
 
