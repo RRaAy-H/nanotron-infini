@@ -120,8 +120,7 @@ def get_dataloader_from_data_stage(trainer: DistributedTrainer, data: DataArgs):
                 * trainer.sequence_length
             )
 
-            if num_tokens_needed_for_training <= total_tokens_dataset:
-                print("intentionally skipping this step for repeat 33 epochs")
+            if num_tokens_needed_for_training > total_tokens_dataset:
                 print(
                     f"Dataset is too small for steps ({total_tokens_dataset} < {num_tokens_needed_for_training}), "
                     f"Try train_steps<={len(dataloader.dataset) // trainer.global_batch_size + trainer.start_iteration_step}"
