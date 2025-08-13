@@ -1,36 +1,36 @@
-# Llama 200M Model Architecture: Complete Guide
+# Llama 300M Model Architecture: Complete Guide
 
 ## Table of Contents
 1. [Introduction](#introduction)
 2. [Model Configuration Overview](#model-configuration-overview)
 3. [Parameter Definitions & Their Roles](#parameter-definitions--their-roles)
-4. [200M Parameter Count Calculation](#200m-parameter-count-calculation)
+4. [300M Parameter Count Calculation](#300m-parameter-count-calculation)
 5. [Architecture Components Deep Dive](#architecture-components-deep-dive)
 6. [Code Implementation Analysis](#code-implementation-analysis)
 7. [Practical Implications](#practical-implications)
 
 ## Introduction
 
-This document provides a comprehensive analysis of the Llama 200M parameter model architecture implemented in the nanotron-infini codebase. We'll explore both the theoretical foundations and practical implementation details, making it accessible to both LLM professionals and deep learning practitioners new to language model training.
+This document provides a comprehensive analysis of the Llama 300M parameter model architecture implemented in the nanotron-infini codebase. We'll explore both the theoretical foundations and practical implementation details, making it accessible to both LLM professionals and deep learning practitioners new to language model training.
 
 ### Model Location in Codebase
 - **Main Architecture**: `src/nanotron/models/llama.py`
 - **Configuration**: `src/nanotron/config/models_config.py`
-- **Example 200M Config**: `examples/infinite-context-length/configs/exp33/exp33_200m_infini_llama2_256_ctx_length_and_64_segment_length_and_2m_bs.yaml`
+- **Current 300M Config**: `fineweb_local_300m_infini_4gpu_config.yaml`
 
 ## Model Configuration Overview
 
-The 200M Llama model uses the following core configuration:
+The 300M Llama model uses the following core configuration:
 
 ```yaml
 model_config:
     hidden_size: 1024           # Core embedding dimension
     intermediate_size: 4096     # FFN intermediate dimension  
-    num_hidden_layers: 6        # Number of transformer blocks
+    num_hidden_layers: 12       # Number of transformer blocks (doubled from 200M)
     num_attention_heads: 8      # Parallel attention heads
     num_key_value_heads: 8      # Key-value heads (GQA support)
     vocab_size: 49152          # Vocabulary size
-    max_position_embeddings: 256 # Maximum sequence length
+    max_position_embeddings: 8192 # Maximum sequence length (32x increase)
     tie_word_embeddings: false  # Separate input/output embeddings
 ```
 
@@ -65,11 +65,11 @@ gate_up_contiguous_chunks = (
 
 **Impact**: Controls the expressiveness of the FFN. Larger values capture more complex patterns but significantly increase parameter count.
 
-### 3. `num_hidden_layers: 6`
+### 3. `num_hidden_layers: 12`
 
 **Professional Interpretation**: The depth of the transformer stack. Each layer contains self-attention + FFN + residual connections + layer normalization.
 
-**Deep Learning Background**: This is like stacking 6 identical neural network blocks on top of each other. Each layer can learn increasingly abstract representations - early layers might learn syntax, later layers might learn semantics. 6 layers is relatively shallow for modern standards but appropriate for a 200M parameter model.
+**Deep Learning Background**: This is like stacking 12 identical neural network blocks on top of each other. Each layer can learn increasingly abstract representations - early layers might learn syntax, later layers might learn semantics. 12 layers provides substantially more depth than the 6-layer 200M model, allowing for more complex pattern learning and better performance on downstream tasks.
 
 **Code Reference** (`src/nanotron/models/llama.py:1144-1162`):
 ```python
@@ -78,7 +78,7 @@ self.decoder = nn.ModuleList([
         module_builder=LlamaDecoderLayer,
         # ... module configuration
     )
-    for layer_idx in range(config.num_hidden_layers)  # Creates 6 layers
+    for layer_idx in range(config.num_hidden_layers)  # Creates 12 layers
 ])
 ```
 
@@ -123,18 +123,18 @@ self.token_embedding = TensorParallelEmbedding(
 )
 ```
 
-### 7. `max_position_embeddings: 256`
+### 7. `max_position_embeddings: 8192`
 
 **Professional Interpretation**: Maximum sequence length the model can handle. The model learns position-specific information up to this length using Rotary Position Embeddings (RoPE).
 
-**Deep Learning Background**: Unlike CNNs where position is implicit, transformers need explicit position information. This parameter sets the maximum sequence length. 256 is quite short by modern standards - typically used for experimental or efficient training scenarios.
+**Deep Learning Background**: Unlike CNNs where position is implicit, transformers need explicit position information. This parameter sets the maximum sequence length. 8192 tokens is a substantial increase from the 256-token 200M model, allowing the model to process much longer documents and maintain context over extended passages.
 
 **Code Reference** (`src/nanotron/models/llama.py:428-434`):
 ```python
 if config.rope_interleaved:
     self.rotary_embedding = RotaryEmbedding(
         dim=self.d_qk, 
-        end=config.max_position_embeddings,  # 256
+        end=config.max_position_embeddings,  # 8192
         theta=config.rope_theta
     )
 ```
@@ -156,9 +156,9 @@ def get_embeddings_lm_head_tied_names(self):
         return []  # Empty list when untied
 ```
 
-## 200M Parameter Count Calculation
+## 300M Parameter Count Calculation
 
-Let's break down exactly how we reach ~201.3M parameters:
+Let's break down exactly how we reach ~301.3M parameters:
 
 ### 1. Token Embeddings
 ```python
@@ -169,7 +169,7 @@ parameters = 49,152 × 1,024 = 50,331,648
 
 **Explanation**: Each of the 49,152 vocabulary tokens needs a 1024-dimensional embedding vector.
 
-### 2. Per-Layer Parameters (6 layers total)
+### 2. Per-Layer Parameters (12 layers total)
 
 #### Attention Components
 
@@ -216,7 +216,7 @@ LayerNorm: 2,048
 Per Layer Total: 16,779,264
 ```
 
-**All 6 Layers**: 16,779,264 × 6 = 100,675,584
+**All 12 Layers**: 16,779,264 × 12 = 201,351,168
 
 ### 3. Final Components
 
@@ -230,11 +230,11 @@ lm_head_parameters = hidden_size × vocab_size = 1,024 × 49,152 = 50,331,648
 ### Final Calculation
 ```
 Token Embeddings:      50,331,648
-Transformer Layers:   100,675,584  
+Transformer Layers:   201,351,168  
 Final Layer Norm:           1,024
 LM Head:              50,331,648
 ──────────────────────────────────
-Total:               201,339,904 ≈ 201.3M parameters
+Total:               302,015,488 ≈ 302.0M parameters
 ```
 
 ## Architecture Components Deep Dive
@@ -286,11 +286,11 @@ class MLP(nn.Module):
 
 ### Infini-Attention Extensions
 
-The model includes experimental Infini-Attention for handling longer sequences:
+The model includes Infini-Attention for handling long sequences efficiently with the following configuration:
 
 ```python
 # src/nanotron/models/llama.py:471-522
-self.segment_length = constants.CONFIG.infini_attention.segment_length  # 64
+self.segment_length = constants.CONFIG.infini_attention.segment_length  # 1024
 # Balance factors for local vs global attention
 self.balance_factors = create_sharded_parameter_from_config(
     parameter=balance_factors,
@@ -299,10 +299,22 @@ self.balance_factors = create_sharded_parameter_from_config(
 )
 ```
 
+**Current Infini-Attention Configuration:**
+```yaml
+infini_attention:
+  segment_length: 1024           # Process sequences in 1024-token segments
+  turn_on_memory: true           # Enable memory compression
+  balance_factor_lr: 0.01        # High learning rate for balance factors
+  balance_act_type: hard_sigmoid # Activation function for gating
+  balance_init_type: zeros       # Initialize balance factors at zero
+  balance_factor_weight_decay: 0.0 # No weight decay on balance factors
+```
+
 This allows the model to process sequences longer than `max_position_embeddings` by:
-1. Splitting sequences into segments
-2. Maintaining global memory across segments
-3. Balancing local (segment) vs global (memory) attention
+1. Splitting 8192-token sequences into 8 segments of 1024 tokens each
+2. Maintaining compressed global memory across segments
+3. Balancing local (segment) vs global (memory) attention with learnable gating
+4. Using optimized training hyperparameters for balance factor convergence
 
 ## Code Implementation Analysis
 
@@ -348,42 +360,56 @@ This includes support for μP (Maximal Update Parameterization) for better scali
 
 ### Model Size vs Performance Trade-offs
 
-**200M Parameter Model Characteristics**:
-- **Strengths**: Fast training/inference, low memory footprint, good for experimentation
-- **Limitations**: Limited knowledge capacity, may struggle with complex reasoning
-- **Sweet Spot**: Proof-of-concept, domain-specific applications, edge deployment
+**300M Parameter Model Characteristics**:
+- **Strengths**: Good balance of capacity and efficiency, suitable for research and small-scale applications
+- **Capabilities**: Can handle more complex patterns than 200M model, better long-context understanding with Infini-Attention
+- **Limitations**: Still limited compared to billion-parameter models, requires careful training for best performance
+- **Sweet Spot**: Research experiments, fine-tuning for specific domains, Infini-Attention validation
 
 ### Memory Requirements
 
-**Training Memory Estimation**:
+**Training Memory Estimation** (with current config):
 ```
-Parameters: 201.3M × 4 bytes (fp32) = ~805MB
-Gradients: 201.3M × 4 bytes = ~805MB  
-Optimizer States (AdamW): 201.3M × 8 bytes = ~1.6GB
-Activations: Varies with batch size and sequence length
-Total: ~3.2GB + activations
+Parameters: 302.0M × 2 bytes (bfloat16) = ~604MB
+Gradients: 302.0M × 4 bytes (fp32) = ~1.2GB  
+Optimizer States (AdamW): 302.0M × 8 bytes = ~2.4GB
+Activations (batch_size=1, seq_len=8192): ~2-4GB per GPU
+Total per GPU: ~4.2GB + activations = ~6-8GB per GPU
+```
+
+**4-GPU Training Setup**:
+```
+Total parameter memory: ~604MB × 4 = ~2.4GB
+Total gradient memory: ~1.2GB × 4 = ~4.8GB
+Total optimizer memory: ~2.4GB × 4 = ~9.6GB
+Activation memory: ~8-16GB total
+Total system memory: ~25-35GB across 4 GPUs
 ```
 
 **Inference Memory** (with optimizations):
 ```
-Parameters: 201.3M × 2 bytes (fp16) = ~403MB
-KV Cache: Varies with sequence length
-Total: ~403MB + KV cache
+Parameters: 302.0M × 2 bytes (fp16) = ~604MB
+KV Cache (8192 seq_len): ~200-400MB depending on batch size
+Total: ~800MB-1GB for inference
+```
+
+### Training Configuration
+
+**Current Training Setup**:
+```yaml
+Training Steps: 30,000
+Sequence Length: 8,192 tokens
+Global Batch Size: 4 sequences (1 per GPU)
+Total Tokens: ~983M tokens
+Learning Rate: 0.00006 (base), 0.01 (balance factors)
+Optimizer: AdamW
+Context: 8 segments × 1024 tokens each
 ```
 
 ### Computational Complexity
 
 The model's FLOPs scale as:
-- **Attention**: O(sequence_length²) per layer
-- **FFN**: O(sequence_length × hidden_size × intermediate_size) per layer
-- **Total**: Dominated by FFN for short sequences, attention for long sequences
-
-### Configuration Choices Rationale
-
-1. **6 layers**: Balances capacity with efficiency for 200M parameters
-2. **8 heads**: Provides good attention diversity without excessive overhead
-3. **4x FFN expansion**: Standard ratio that works well empirically
-4. **Untied embeddings**: Provides more flexibility at the cost of parameters
-5. **Short context (256)**: Enables efficient training and experimentation
-
-This architecture represents a well-balanced design for a compact language model, suitable for research, experimentation, and resource-constrained applications while maintaining the core architectural innovations of modern transformer models.
+- **Attention**: O(sequence_length²) per layer = O(8192²) = ~67M operations per layer
+- **FFN**: O(sequence_length × hidden_size × intermediate_size) per layer = O(8192 × 1024 × 4096) = ~34B operations per layer
+- **Total per layer**: ~34B FLOPs (dominated by FFN)
+- **Total model**: ~34B × 12 = ~408B FLOPs per forward pass
