@@ -2,7 +2,7 @@
 # Passkey evaluation for 300M Infini-Attention model
 set -e  # Exit on any error
 
-CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/10000}"  # latest checkpoint
+CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/15000}"  # latest checkpoint
 CONTEXT_LENGTH="${2:-1024}"  # Start with 1K for testing, can go up to 8192
 NUM_SAMPLES="${3:-25}"       # Reduced to save memory
 

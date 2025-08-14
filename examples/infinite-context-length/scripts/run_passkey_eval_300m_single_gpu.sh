@@ -2,7 +2,7 @@
 # Low memory passkey evaluation for 300M Infini-Attention model
 set -e
 
-CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/10000}"
+CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/15000}"
 CONTEXT_LENGTH="${2:-1024}"
 NUM_SAMPLES="${3:-10}"  # Very small for testing
 GPU_DEVICE="${4:-6}"  # GPU device to use (default: 6)

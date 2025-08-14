@@ -27,8 +27,17 @@ def token_length(tokenizer, text):
 
 def read_context_files(tokenizer, soft_prompt, retrieval_question, target_cut_length):
     context = ""
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    files = glob.glob(os.path.join(base_dir, haystack_dir, "*.txt"))
+    # Use current working directory instead of script directory
+    if os.path.isabs(haystack_dir):
+        # If haystack_dir is absolute path, use it directly
+        files = glob.glob(os.path.join(haystack_dir, "*.txt"))
+    else:
+        # If relative path, search from current working directory
+        files = glob.glob(os.path.join(haystack_dir, "*.txt"))
+    
+    if not files:
+        raise FileNotFoundError(f"No .txt files found in haystack directory: {haystack_dir}")
+    
     file_index = 0
 
     # target_context_length = context_length - token_length(tokenizer, soft_prompt) - token_length(tokenizer, retrieval_question)
