@@ -65,13 +65,26 @@ for CONTEXT in "${CONTEXT_LENGTHS[@]}"; do
     SAVE_DIR="${BASE_SAVE_DIR}/context_${CONTEXT}"
     mkdir -p $SAVE_DIR
     
-    # Select appropriate dataset
+    # Check for local datasets first, fallback to HuggingFace
+    LOCAL_1K_DATASET="./llama3-1024-passkey-retrieval-eval"
+    LOCAL_16K_DATASET="./llama3-16k-passkey-retrieval-eval"
+    
     if [ "$CONTEXT" -le 1024 ]; then
-        DATASET="nanotron/llama3-1024-passkey-retrieval-eval"
-        echo "Using dataset: $DATASET (1K dataset)"
+        if [ -d "$LOCAL_1K_DATASET" ]; then
+            DATASET="$LOCAL_1K_DATASET"
+            echo "Using local 1K dataset: $DATASET"
+        else
+            DATASET="nanotron/llama3-1024-passkey-retrieval-eval"
+            echo "Using HuggingFace 1K dataset: $DATASET"
+        fi
     elif [ "$CONTEXT" -le 16384 ]; then
-        DATASET="nanotron/llama3-16k-passkey-retrieval-eval"
-        echo "Using dataset: $DATASET (16K dataset)"
+        if [ -d "$LOCAL_16K_DATASET" ]; then
+            DATASET="$LOCAL_16K_DATASET"
+            echo "Using local 16K dataset: $DATASET"
+        else
+            DATASET="nanotron/llama3-16k-passkey-retrieval-eval"
+            echo "Using HuggingFace 16K dataset: $DATASET"
+        fi
     else
         echo "WARNING: Context length $CONTEXT exceeds available datasets"
         echo "Skipping context length $CONTEXT"

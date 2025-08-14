@@ -4,7 +4,7 @@ set -e  # Exit on any error
 
 CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/30000}"  # latest checkpoint
 CONTEXT_LENGTH="${2:-1024}"  # Start with 1K for testing, can go up to 8192
-NUM_SAMPLES="${3:-50}"       # Number of samples to evaluate per depth
+NUM_SAMPLES="${3:-25}"       # Reduced to save memory
 
 # Create results directory with timestamp
 SAVE_DIR="./results/passkey_300m_$(date +%Y%m%d_%H%M%S)"
@@ -30,13 +30,26 @@ echo "Segment Length: 1024 (from config)"
 echo "Results will be saved to: $SAVE_DIR"
 echo "=========================================================="
 
-# Select appropriate dataset based on context length
+# Check for local datasets first, fallback to HuggingFace
+LOCAL_1K_DATASET="./llama3-1024-passkey-retrieval-eval"
+LOCAL_16K_DATASET="./llama3-16k-passkey-retrieval-eval"
+
 if [ "$CONTEXT_LENGTH" -le 1024 ]; then
-    DATASET="nanotron/llama3-1024-passkey-retrieval-eval"
-    echo "Using 1K dataset: $DATASET"
+    if [ -d "$LOCAL_1K_DATASET" ]; then
+        DATASET="$LOCAL_1K_DATASET"
+        echo "Using local 1K dataset: $DATASET"
+    else
+        DATASET="nanotron/llama3-1024-passkey-retrieval-eval"
+        echo "Using HuggingFace 1K dataset: $DATASET"
+    fi
 elif [ "$CONTEXT_LENGTH" -le 16384 ]; then
-    DATASET="nanotron/llama3-16k-passkey-retrieval-eval"
-    echo "Using 16K dataset: $DATASET"
+    if [ -d "$LOCAL_16K_DATASET" ]; then
+        DATASET="$LOCAL_16K_DATASET"
+        echo "Using local 16K dataset: $DATASET"
+    else
+        DATASET="nanotron/llama3-16k-passkey-retrieval-eval"
+        echo "Using HuggingFace 16K dataset: $DATASET"
+    fi
 else
     echo "ERROR: Context length $CONTEXT_LENGTH not supported by pre-built datasets"
     echo "Available datasets support up to 16K tokens"
@@ -45,14 +58,14 @@ fi
 
 # Set environment variables for distributed training
 export CUDA_DEVICE_MAX_CONNECTIONS=1
-export CUDA_VISIBLE_DEVICES=4,5,6,7
+export CUDA_VISIBLE_DEVICES=4,5
 
 # Run evaluation using the same parallelism as training (4 DP)
 echo "Starting evaluation..."
 echo "Command: torchrun --nproc_per_node=4 examples/infinite-context-length/scripts/run_passkey_eval.py"
 echo ""
 
-torchrun --nproc_per_node=4 \
+torchrun --nproc_per_node=2 \
     examples/infinite-context-length/scripts/run_passkey_eval.py \
     --ckpt-path $CHECKPOINT_PATH \
     --save_path $SAVE_DIR \
@@ -62,7 +75,7 @@ torchrun --nproc_per_node=4 \
     --seed 42 \
     --num_samples $NUM_SAMPLES \
     --max-new-tokens 15 \
-    --dp 4 \
+    --dp 2 \
     --tp 1 \
     --pp 1
 

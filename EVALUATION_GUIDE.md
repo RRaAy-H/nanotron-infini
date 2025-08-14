@@ -342,7 +342,19 @@ torchrun --nproc_per_node=4 \
 
 ## Available Pre-built Datasets
 
-### HuggingFace Datasets (Recommended)
+### Using Local Datasets (Recommended for Offline Use)
+
+If you have downloaded the datasets locally, place them in your project root:
+
+```bash
+# Expected directory structure:
+./llama3-1024-passkey-retrieval-eval/     # 1K dataset
+./llama3-16k-passkey-retrieval-eval/      # 16K dataset
+```
+
+The scripts will automatically detect and use local datasets, avoiding network downloads.
+
+### HuggingFace Datasets (Online)
 
 | Dataset | Context Length | Samples | Best For |
 |---------|---------------|---------|----------|
