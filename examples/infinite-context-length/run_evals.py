@@ -2349,13 +2349,14 @@ def main():
         tokenizer.padding_side = "left"
         tokenizer.truncation_side = "left"  # TODO @nouamane: do we want this?
 
-        import wandb
-
-        if dist.get_rank() == 0:
-            wandb.init(
-                project="debug_infini_attention",
-                name="debug_infini_attention",
-            )
+        # Disabled wandb to avoid SSL errors
+        # import wandb
+        #
+        # if dist.get_rank() == 0:
+        #     wandb.init(
+        #         project="debug_infini_attention",
+        #         name="debug_infini_attention",
+        #     )
 
         # dummy_inputs = [
         #     # "Passage: Daniel went back to the garden. Mary travelled to the kitchen. Sandra journeyed to the kitchen. Sandra went to the hallway. John went to the bedroom. Mary went back to the garden. Where is Mary?\nAnswer:",
@@ -2370,16 +2371,15 @@ def main():
 
         # generate(args, model, tokenizer, [HARRY_POTTER], parallel_context)
 
-        # dataset = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
-        # df = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
-        # from datasets import load_dataset
+        from datasets import load_dataset
+        
+        # Using the nanotron/simple_needle_in_a_hay_stack dataset
+        dataset = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
+        df = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
 
-        # dataset = load_dataset("lvwerra/needle-llama3-16x512", split="train")
-        # df = load_dataset("lvwerra/needle-llama3-16x512", split="train")
-
-        # NOTE: filter out only samples with context_length is 32768
-        dataset = dataset.filter(lambda x: x["context_length"] == 32768 and x["depth_percent"] == depth_percent)
-        df = df.filter(lambda x: x["context_length"] == 32768 and x["depth_percent"] == depth_percent)
+        # NOTE: filter out only samples with the specified context_length
+        dataset = dataset.filter(lambda x: x["context_length"] == args.context_length and x["depth_percent"] == depth_percent)
+        df = df.filter(lambda x: x["context_length"] == args.context_length and x["depth_percent"] == depth_percent)
 
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
@@ -2391,11 +2391,11 @@ def main():
 
         for batch in tqdm(dataloader):
             print("--------------------------------------------------")
-            print(f"target answer: {batch['answer']}")
-            texts = batch["prompt"]
+            print(f"target answer: {batch['answer'][0]}")  # Using 'answer' field from nanotron dataset
+            texts = batch["prompt"]  # Using 'prompt' field from nanotron dataset
             from nanotron import constants
 
-            constants.NEEDLE = batch["answer"].item()
+            constants.NEEDLE = batch["answer"][0]  # Using 'answer' field
 
             responses.append(generate(args, model, tokenizer, texts, parallel_context))
 
