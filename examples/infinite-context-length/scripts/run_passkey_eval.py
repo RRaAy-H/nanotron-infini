@@ -351,12 +351,14 @@ def main():
             responses = [x for sublist in responses for x in sublist]
             answer_idxs = [x for sublist in answer_idxs for x in sublist]
 
-            df["generation_text"] = responses
-            df["generation_ids"] = answer_idxs
+            # Only save results on rank 0 to avoid distributed training issues
+            if parallel_context.get_global_rank() == 0:
+                df["generation_text"] = responses
+                df["generation_ids"] = answer_idxs
 
-            df.to_pickle(
-                f"{save_path}/passkey_eval_results_for_{depth_percent}_depth_and_num_shots_{num_shots}_and_num_samples_{num_samples}_and_num_digits_{num_digits}_and_seed_{seed}.pkl"
-            )
+                df.to_pickle(
+                    f"{save_path}/passkey_eval_results_for_{depth_percent}_depth_and_num_shots_{num_shots}_and_num_samples_{num_samples}_and_num_digits_{num_digits}_and_seed_{seed}.pkl"
+                )
 
 
 if __name__ == "__main__":
