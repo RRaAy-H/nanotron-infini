@@ -79,8 +79,8 @@ for DEPTH in "${DEPTHS[@]}"; do
         echo "Running evaluation for depth ${DEPTH}%..."
         
         export CUDA_DEVICE_MAX_CONNECTIONS=1
-        export CUDA_VISIBLE_DEVICES=4,5,6,7
-        torchrun --nproc_per_node=4 \
+        export CUDA_VISIBLE_DEVICES=6
+        torchrun --nproc_per_node=1 \
             examples/infinite-context-length/scripts/run_passkey_eval.py \
             --ckpt-path $CHECKPOINT_PATH \
             --save_path "${SAVE_DIR}/results_depth_${DEPTH}" \
@@ -90,7 +90,7 @@ for DEPTH in "${DEPTHS[@]}"; do
             --seed 42 \
             --num_samples $NUM_SAMPLES \
             --max-new-tokens 15 \
-            --dp 4 \
+            --dp 1 \
             --tp 1 \
             --pp 1
     else
