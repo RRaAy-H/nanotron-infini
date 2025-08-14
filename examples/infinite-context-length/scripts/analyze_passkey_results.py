@@ -296,11 +296,26 @@ def analyze_passkey_results(results_dir: str, verbose: bool = True) -> Dict[str,
         'performance': performance
     }
     
+    # Convert numpy types to Python native types for JSON serialization
+    def convert_numpy_types(obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {key: convert_numpy_types(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_numpy_types(item) for item in obj]
+        return obj
+    
     # Save summary to JSON
     summary_path = results_path / "summary.json"
     try:
+        analysis_result_serializable = convert_numpy_types(analysis_result)
         with open(summary_path, 'w') as f:
-            json.dump(analysis_result, f, indent=2)
+            json.dump(analysis_result_serializable, f, indent=2)
         if verbose:
             print(f"\nDetailed summary saved to: {summary_path}")
     except Exception as e:
@@ -319,7 +334,19 @@ def main():
     
     if args.json_only:
         result = analyze_passkey_results(args.results_dir, verbose=False)
-        print(json.dumps(result, indent=2))
+        def convert_numpy_types(obj):
+            if isinstance(obj, np.integer):
+                return int(obj)
+            elif isinstance(obj, np.floating):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            elif isinstance(obj, dict):
+                return {key: convert_numpy_types(value) for key, value in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy_types(item) for item in obj]
+            return obj
+        print(json.dumps(convert_numpy_types(result), indent=2))
     else:
         analyze_passkey_results(args.results_dir, verbose=not args.quiet)
 

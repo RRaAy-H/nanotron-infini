@@ -8,7 +8,7 @@ NUM_SAMPLES="${3:-10}"  # Very small for testing
 GPU_DEVICE="${4:-6}"  # GPU device to use (default: 6)
 
 # Create results directory
-SAVE_DIR="./results/passkey_300m_lowmem_$(date +%Y%m%d_%H%M%S)"
+SAVE_DIR="./results/passkey_300m_single_gpu_$(date +%Y%m%d_%H%M%S)"
 mkdir -p $SAVE_DIR
 
 echo "=========================================================="
@@ -59,8 +59,6 @@ nvidia-smi --gpu-reset > /dev/null 2>&1 || true
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export CUDA_VISIBLE_DEVICES=$GPU_DEVICE  # Use specified GPU
 export PYTORCH_CUDA_ALLOC_CONF="max_split_size_mb:128"
-
-echo "Starting low-memory evaluation on GPU $GPU_DEVICE..."
 
 torchrun --nproc_per_node=1 \
     examples/infinite-context-length/scripts/run_passkey_eval.py \
