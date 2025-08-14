@@ -2410,12 +2410,23 @@ def main():
         # NOTE: now flatten the responses
         responses = [response for sublist in responses for response in sublist]
         df["response"] = responses
-        # df["match"] = df.apply(lambda x: int(str(x["needle"]) in x["response"]), axis=1)
-
-        # NOTE: move anything from gpu to cpu in df
-
-        # nOTE: now save df
-        # df.to_pickle(f'needle_finetune_format_dataset_but_for_evals_{context_length}_ctx_and_{depth_percent}_depth.pkl')
+        
+        # Calculate if the model found the needle (answer) in each response
+        df["match"] = df.apply(lambda x: int(str(x["answer"]) in x["response"]), axis=1)
+        
+        # Calculate and print accuracy metrics
+        total_samples = len(df)
+        correct_samples = df["match"].sum()
+        accuracy = (correct_samples / total_samples) * 100 if total_samples > 0 else 0
+        
+        print("\n" + "="*60)
+        print(f"EVALUATION RESULTS")
+        print(f"Context Length: {args.context_length}")
+        print(f"Depth Percent: {depth_percent}%")
+        print(f"Total Samples: {total_samples}")
+        print(f"Correct Predictions: {correct_samples}")
+        print(f"Accuracy: {accuracy:.2f}%")
+        print("="*60 + "\n")
 
     dist.barrier()
 

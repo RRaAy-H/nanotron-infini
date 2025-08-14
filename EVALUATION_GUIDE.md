@@ -11,6 +11,7 @@ The evaluation script tests the model's ability to retrieve specific information
 - Trained model checkpoint with `config.yaml`
 - CUDA-capable GPU(s)
 - Python environment with nanotron-infini installed
+- Local dataset: `nanotron/simple_needle_in_a_hay_stack/train-00000-of-00001.parquet`
 
 ## Basic Command Structure
 
@@ -107,6 +108,31 @@ torchrun --nproc_per_node=<num_gpus> examples/infinite-context-length/run_evals.
 --max-new-tokens 100  # Longer responses
 ```
 
+## Quick Start with run_evals.sh Script
+
+For convenient evaluation, use the provided `run_evals.sh` script:
+
+```bash
+# Run with default depth (50%)
+bash examples/infinite-context-length/scripts/run_evals.sh
+
+# Run with specific depth percentage
+bash examples/infinite-context-length/scripts/run_evals.sh 75
+
+# Run multiple depths
+for depth in 0 25 50 75 100; do
+    bash examples/infinite-context-length/scripts/run_evals.sh $depth
+done
+```
+
+The script is pre-configured with:
+- GPU device 6 (`CUDA_VISIBLE_DEVICES=6`)
+- Single GPU execution (`--nproc_per_node=1`)
+- 300M model checkpoint at step 15000
+- 16K context length
+- All parallelism set to 1 (single GPU mode)
+- Local dataset loading from parquet files
+
 ## Example Usage
 
 ### 1. Quick Development Test
@@ -192,15 +218,24 @@ torchrun --nproc_per_node=1 examples/infinite-context-length/run_evals.py \
 ## Understanding the Output
 
 The script will output:
-- **Input**: The full context with embedded needle information
-- **Generation**: The model's response attempting to retrieve the needle
-- **Success/Failure**: Whether the model correctly identified the needle
+- **Target answer**: The needle information to find
+- **Model response**: The model's attempt to retrieve the needle
+- **Evaluation metrics**: Accuracy statistics at the end
 
 Example output:
 ```
-08/12/2025 18:41:23 [INFO|DP=0|PP=0|TP=0]: input: The needle information is 42857. [long haystack text...]
-08/12/2025 18:41:23 [INFO|DP=0|PP=0|TP=0]: generation: 42857
 --------------------------------------------------
+target answer: 42857
+08/12/2025 18:41:23 [INFO|DP=0|PP=0|TP=0]: generation: 42857
+
+============================================================
+EVALUATION RESULTS
+Context Length: 16384
+Depth Percent: 50%
+Total Samples: 25
+Correct Predictions: 23
+Accuracy: 92.00%
+============================================================
 ```
 
 ## Performance Expectations
@@ -227,6 +262,7 @@ Example output:
      - Reduce `--context_length`
      - Increase `--tp` for tensor parallelism
      - Reduce `--num_shots`
+     - Use specific GPU with `CUDA_VISIBLE_DEVICES`
 
 3. **Checkpoint not found**
    - **Check**: Verify checkpoint path exists and contains `config.yaml`
@@ -235,6 +271,15 @@ Example output:
 4. **Context length too large**
    - **Limit**: Use `--context_length` ≤ model's `max_position_embeddings`
    - **Check**: Review model config for position embedding limits
+
+5. **Dataset download errors (SSL/Network issues)**
+   - **Solution**: Use local parquet files instead
+   - **Place datasets in**: `nanotron/simple_needle_in_a_hay_stack/train-00000-of-00001.parquet`
+   - **The script automatically detects and uses local files**
+
+6. **WandB SSL errors**
+   - **Solution**: WandB has been disabled in the updated script
+   - **Alternative**: Results are printed to console with accuracy metrics
 
 ## Best Practices
 
