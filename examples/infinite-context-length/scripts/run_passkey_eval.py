@@ -117,14 +117,35 @@ def generate(args, model, tokenizer, inputs, parallel_context):
 
 def load_and_filter_dataset(eval_dataset_path, depth_percent, num_shots, num_digits, seed, num_samples):
     import random
+    import os
+    from pathlib import Path
 
     from datasets import load_dataset
 
     # Set seeds for reproducibility
     random.seed(seed)
 
-    # Load the dataset
-    dataset = load_dataset(eval_dataset_path, split="train")
+    # Check if this is a local parquet file or directory
+    if os.path.exists(eval_dataset_path):
+        path = Path(eval_dataset_path)
+        if path.is_file() and path.suffix == '.parquet':
+            # Direct parquet file
+            dataset = load_dataset("parquet", data_files=str(path), split="train")
+        elif path.is_dir():
+            # Check if directory contains parquet files
+            parquet_files = list(path.glob("*.parquet"))
+            if parquet_files:
+                # Directory with parquet files
+                dataset = load_dataset("parquet", data_files=[str(f) for f in parquet_files], split="train")
+            else:
+                # Standard HuggingFace dataset directory structure
+                dataset = load_dataset(eval_dataset_path, split="train")
+        else:
+            # Try as standard dataset path
+            dataset = load_dataset(eval_dataset_path, split="train")
+    else:
+        # Remote HuggingFace dataset
+        dataset = load_dataset(eval_dataset_path, split="train")
 
     # Filter the dataset
     filtered_dataset = dataset.filter(lambda x: x["depth_percent"] == depth_percent and x["num_shots"] == num_shots)

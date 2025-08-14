@@ -347,12 +347,15 @@ torchrun --nproc_per_node=4 \
 If you have downloaded the datasets locally, place them in your project root:
 
 ```bash
-# Expected directory structure:
-./llama3-1024-passkey-retrieval-eval/     # 1K dataset
-./llama3-16k-passkey-retrieval-eval/      # 16K dataset
+# Expected directory structure for parquet files:
+./llama3-1024-passkey-retrieval-eval/
+└── train-00000-of-00001.parquet          # 1K dataset
+
+./llama3-16k-passkey-retrieval-eval/  
+└── train-00000-of-00001.parquet          # 16K dataset
 ```
 
-The scripts will automatically detect and use local datasets, avoiding network downloads.
+The scripts will automatically detect and use local parquet datasets, avoiding network downloads.
 
 ### HuggingFace Datasets (Online)
 

@@ -35,7 +35,8 @@ LOCAL_1K_DATASET="./llama3-1024-passkey-retrieval-eval"
 LOCAL_16K_DATASET="./llama3-16k-passkey-retrieval-eval"
 
 if [ "$CONTEXT_LENGTH" -le 1024 ]; then
-    if [ -d "$LOCAL_1K_DATASET" ]; then
+    # Check for directory or direct parquet file
+    if [ -d "$LOCAL_1K_DATASET" ] || [ -f "$LOCAL_1K_DATASET/train-00000-of-00001.parquet" ]; then
         DATASET="$LOCAL_1K_DATASET"
         echo "Using local 1K dataset: $DATASET"
     else
@@ -43,7 +44,8 @@ if [ "$CONTEXT_LENGTH" -le 1024 ]; then
         echo "Using HuggingFace 1K dataset: $DATASET"
     fi
 elif [ "$CONTEXT_LENGTH" -le 16384 ]; then
-    if [ -d "$LOCAL_16K_DATASET" ]; then
+    # Check for directory or direct parquet file
+    if [ -d "$LOCAL_16K_DATASET" ] || [ -f "$LOCAL_16K_DATASET/train-00000-of-00001.parquet" ]; then
         DATASET="$LOCAL_16K_DATASET"
         echo "Using local 16K dataset: $DATASET"
     else
