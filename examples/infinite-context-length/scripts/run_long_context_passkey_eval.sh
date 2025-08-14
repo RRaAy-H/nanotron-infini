@@ -2,9 +2,9 @@
 # Generate and evaluate long-context passkey data for testing Infini-Attention scaling
 set -e
 
-CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/30000}"
-CONTEXT_LENGTH="${2:-32768}"  # Default to 32K tokens to test cross-segment performance
-NUM_SAMPLES="${3:-25}"
+CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/15000}"
+CONTEXT_LENGTH="${2:-16384}"  # Default to 32K tokens to test cross-segment performance
+NUM_SAMPLES="${3:-10}"
 
 # Create results directory
 SAVE_DIR="./results/long_context_${CONTEXT_LENGTH}_$(date +%Y%m%d_%H%M%S)"

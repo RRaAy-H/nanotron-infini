@@ -137,6 +137,10 @@ def load_and_filter_dataset(eval_dataset_path, depth_percent, num_shots, num_dig
             if parquet_files:
                 # Directory with parquet files
                 dataset = load_dataset("parquet", data_files=[str(f) for f in parquet_files], split="train")
+            elif (path / "dataset_info.json").exists() or (path / "data-00000-of-00001.arrow").exists():
+                # Dataset saved with save_to_disk
+                from datasets import load_from_disk
+                dataset = load_from_disk(eval_dataset_path)
             else:
                 # Standard HuggingFace dataset directory structure
                 dataset = load_dataset(eval_dataset_path, split="train")
