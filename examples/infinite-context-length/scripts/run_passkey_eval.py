@@ -353,7 +353,7 @@ def main():
 
             # Only save results on rank 0 to avoid distributed training issues
             # For single GPU or when using data parallel, only rank 0 saves
-            if parallel_context.dp_rank == 0 and parallel_context.tp_rank == 0 and parallel_context.pp_rank == 0:
+            if dist.get_rank(parallel_context.dp_pg) == 0 and dist.get_rank(parallel_context.tp_pg) == 0 and dist.get_rank(parallel_context.pp_pg) == 0:
                 df["generation_text"] = responses
                 df["generation_ids"] = answer_idxs
 
