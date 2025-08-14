@@ -352,7 +352,8 @@ def main():
             answer_idxs = [x for sublist in answer_idxs for x in sublist]
 
             # Only save results on rank 0 to avoid distributed training issues
-            if parallel_context.get_global_rank() == 0:
+            # For single GPU or when using data parallel, only rank 0 saves
+            if parallel_context.dp_rank == 0 and parallel_context.tp_rank == 0 and parallel_context.pp_rank == 0:
                 df["generation_text"] = responses
                 df["generation_ids"] = answer_idxs
 
