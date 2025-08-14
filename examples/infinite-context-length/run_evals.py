@@ -2372,10 +2372,18 @@ def main():
         # generate(args, model, tokenizer, [HARRY_POTTER], parallel_context)
 
         from datasets import load_dataset
+        import os
         
-        # Using the nanotron/simple_needle_in_a_hay_stack dataset
-        dataset = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
-        df = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
+        # Load dataset from local parquet file
+        # Check if local file exists first
+        local_dataset_path = "nanotron/simple_needle_in_a_hay_stack/train-00000-of-00001.parquet"
+        if os.path.exists(local_dataset_path):
+            dataset = load_dataset("parquet", data_files=local_dataset_path, split="train")
+            df = load_dataset("parquet", data_files=local_dataset_path, split="train")
+        else:
+            # Fallback to downloading if local file doesn't exist
+            dataset = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
+            df = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
 
         # NOTE: filter out only samples with the specified context_length
         dataset = dataset.filter(lambda x: x["context_length"] == args.context_length and x["depth_percent"] == depth_percent)
