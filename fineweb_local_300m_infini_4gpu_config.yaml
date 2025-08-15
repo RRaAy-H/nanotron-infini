@@ -1,6 +1,6 @@
 general:
   benchmark_csv_path: null
-  consumed_train_samples: null
+  consumed_train_samples: 80000
   ignore_sanity_checks: false
   project: llama_300m_infini_4gpu_fineweb
   run: 4gpu_fineweb_300m_experiment
