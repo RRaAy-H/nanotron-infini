@@ -110,10 +110,10 @@ data_stages:
 
 # Checkpoints Configuration
 checkpoints:
-  checkpoint_interval: 5000  
+  checkpoint_interval: 2000  
   checkpoints_path: ./checkpoints/fineweb_4gpu_300m_infini
   checkpoints_path_is_shared_file_system: false
-  resume_checkpoint_path: null
+  resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/20000
   save_initial_state: true
 
 # Logging Configuration
