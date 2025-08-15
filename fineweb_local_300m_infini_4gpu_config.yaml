@@ -95,7 +95,7 @@ tokens:
 # Data Configuration for Local FineWeb Dataset
 data_stages:
   - name: "4GPU FineWeb 300M Stage"
-    start_training_step: 1
+    start_training_step: 20000
     data:
       dataset:
         hf_dataset_or_datasets: "parquet"
