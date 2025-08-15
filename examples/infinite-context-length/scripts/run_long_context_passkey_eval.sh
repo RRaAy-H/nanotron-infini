@@ -78,6 +78,9 @@ for DEPTH in "${DEPTHS[@]}"; do
     if [ -d "$DATASET_PATH" ]; then
         echo "Running evaluation for depth ${DEPTH}%..."
         
+        # Create results subdirectory for this depth
+        mkdir -p "${SAVE_DIR}/results_depth_${DEPTH}"
+        
         export CUDA_DEVICE_MAX_CONNECTIONS=1
         export CUDA_VISIBLE_DEVICES=6
         torchrun --nproc_per_node=1 \
