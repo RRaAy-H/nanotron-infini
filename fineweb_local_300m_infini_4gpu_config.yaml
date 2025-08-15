@@ -5,7 +5,7 @@ general:
   project: llama_300m_infini_4gpu_fineweb
   run: 4gpu_fineweb_300m_experiment
   seed: 42
-  step: null
+  step: 20000
 
 # Infini-Attention Configuration - Updated to match reference specs
 infini_attention:
@@ -95,7 +95,7 @@ tokens:
 # Data Configuration for Local FineWeb Dataset
 data_stages:
   - name: "4GPU FineWeb 300M Stage"
-    start_training_step: 20000
+    start_training_step: 1
     data:
       dataset:
         hf_dataset_or_datasets: "parquet"
