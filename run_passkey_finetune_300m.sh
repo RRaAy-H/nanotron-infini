@@ -1,11 +1,7 @@
-#!/bin/bash
-# Passkey Finetuning Script for 300M Infini-Attention Model
-# Finetunes the model on 10K token passkey retrieval task for 400 steps
-
 set -e  # Exit on error
 
 # Configuration
-CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/30000}"  # Your trained checkpoint
+CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/30000}" 
 NUM_EXAMPLES="${2:-2000}"  # Number of training examples to generate
 SEED="${3:-42}"
 
@@ -15,7 +11,7 @@ echo "=========================================================="
 echo "Base checkpoint: $CHECKPOINT_PATH"
 echo "Training examples: $NUM_EXAMPLES"
 echo "Sequence length: 10240 tokens (~10K)"
-echo "Training steps: 400"
+echo "Training steps: 500"
 echo "Seed: $SEED"
 echo "=========================================================="
 
@@ -121,7 +117,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "Checkpoints saved to: ./checkpoints/passkey_finetune_300m/"
     echo ""
-    echo "Final checkpoint should be at step 400:"
+    echo "Final checkpoint should be at step 500:"
     ls -la ./checkpoints/passkey_finetune_300m/ 2>/dev/null || echo "Check the checkpoint directory"
     
     # Clean up temp config
@@ -130,10 +126,9 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "Next steps:"
     echo "1. Evaluate the model using the passkey eval script:"
-    echo "   ./examples/infinite-context-length/scripts/run_passkey_eval_300m.sh ./checkpoints/passkey_finetune_300m/400 10240"
+    echo "   ./examples/infinite-context-length/scripts/run_passkey_eval_300m.sh ./checkpoints/passkey_finetune_300m/500 10240"
     echo ""
-    echo "2. Or use the model for inference with run_generate.py"
-    
+
 else
     echo ""
     echo "ERROR: Finetuning failed. Check the logs above for details."

@@ -60,8 +60,8 @@ Edit `passkey_finetune_300m_config.yaml` if needed:
 ```yaml
 # Key settings to adjust:
 resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000  # Your checkpoint
-sequence_length: 10240  # 10K tokens
-train_steps: 400  # Number of finetuning steps
+sequence_length: 10240  # 10K tokens  
+train_steps: 500  # Number of finetuning steps
 learning_rate: 0.00005  # Lower LR for finetuning
 micro_batch_size: 1  # Adjust based on GPU memory
 dp: 4  # Number of GPUs for data parallelism
@@ -73,27 +73,36 @@ dp: 4  # Number of GPUs for data parallelism
 # The script will:
 # 1. Generate the passkey dataset
 # 2. Update config with your checkpoint path
-# 3. Run the finetuning for 400 steps
+# 3. Run the finetuning for 500 steps
 
 ./run_passkey_finetune_300m.sh ./checkpoints/fineweb_4gpu_300m_infini/30000
 ```
 
 ## Training Details
 
-### Hyperparameters
+### Hyperparameters (from config)
 - **Sequence Length**: 10,240 tokens (~10K)
-- **Training Steps**: 400
+- **Training Steps**: 500
 - **Learning Rate**: 5e-5 (with cosine decay)
-- **Warmup Steps**: 40 (10% of total)
+- **Warmup Steps**: 50 (10% of total steps)
+- **Min Learning Rate**: 5e-6 (after decay)
 - **Batch Size**: 1 per GPU (due to long sequences)
-- **Optimizer**: AdamW (β1=0.9, β2=0.95)
+- **Gradient Accumulation**: 1 (no accumulation)
+- **Optimizer**: AdamW (β1=0.9, β2=0.95, eps=1e-8)
 - **Weight Decay**: 0.01
+- **Gradient Clipping**: 1.0
+- **Precision**: bfloat16
+- **Accumulate Gradients in FP32**: Yes
 
-### Infini-Attention Settings
-- **Segment Length**: 1024 tokens
-- **Memory**: Enabled
+### Infini-Attention Settings (from config)
+- **Segment Length**: 1024 tokens (DO NOT CHANGE - must match pretraining)
+- **Memory**: Enabled (`turn_on_memory: true`)
 - **Balance Factor LR**: 0.01
-- **Activation**: Hard sigmoid
+- **Balance Factor Weight Decay**: 0.0 (no decay)
+- **Activation**: Hard sigmoid (`balance_act_type`)
+- **Initialization**: Zeros (`balance_init_type`)
+- **Logging Interval**: Every 100 steps
+- **Max Position Embeddings**: 8192 (matches pretraining)
 
 ### Dataset Characteristics
 - **Total Examples**: 2000 (configurable)
@@ -104,9 +113,10 @@ dp: 4  # Number of GPUs for data parallelism
 ## Monitoring Training
 
 Training logs will show:
-- Loss per iteration
-- Learning rate schedule
-- Memory usage statistics (if Infini-attention logging enabled)
+- **Loss per iteration**: Logged every 10 steps (`iteration_step_info_interval: 10`)
+- **Learning rate schedule**: Cosine decay from 5e-5 to 5e-6
+- **Memory usage statistics**: Logged every 100 steps (Infini-attention `logging_interval`)
+- **Checkpoints**: Saved every 100 steps at steps 100, 200, 300, 400, 500
 
 ## After Training
 
@@ -115,7 +125,7 @@ Training logs will show:
 ```bash
 # Use the existing evaluation script
 ./examples/infinite-context-length/scripts/run_passkey_eval_300m.sh \
-    ./checkpoints/passkey_finetune_300m/400 \
+    ./checkpoints/passkey_finetune_300m/500 \
     10240 \
     25
 ```
@@ -124,13 +134,13 @@ Training logs will show:
 
 ```bash
 torchrun --nproc_per_node=4 run_generate.py \
-    --ckpt-path ./checkpoints/passkey_finetune_300m/400 \
+    --ckpt-path ./checkpoints/passkey_finetune_300m/500 \
     --dp 4 --tp 1 --pp 1
 ```
 
 ## Expected Results
 
-After 400 finetuning steps, the model should achieve:
+After 500 finetuning steps, the model should achieve:
 - **High accuracy** (>90%) on passkey retrieval at various depths
 - **Consistent performance** across different passkey positions
 - **Ability to handle 10K token sequences** effectively
@@ -168,20 +178,6 @@ To train with different sequence lengths:
 1. Generate dataset with desired length:
 ```bash
 python3 generate_passkey_finetune_data.py --target_length 8192
-```
-
-2. Update config:
-```yaml
-sequence_length: 8192
-max_position_embeddings: 8192
-```
-
-### Adjusting Memory Segments
-
-For different segment configurations:
-```yaml
-infini_attention:
-  segment_length: 2048  # Larger segments
 ```
 
 ### Custom Passkey Formats
