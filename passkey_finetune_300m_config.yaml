@@ -89,7 +89,7 @@ tokens:
   limit_val_batches: 0
   micro_batch_size: 1
   sequence_length: 10240
-  train_steps: 500
+  train_steps: 30500  # 30000 (checkpoint) + 500 (finetune steps)
   val_check_interval: -1
 
 # Data Configuration for Passkey Finetuning Dataset
