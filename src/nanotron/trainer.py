@@ -400,28 +400,40 @@ class DistributedTrainer:
             gc.collect()
 
         dataloader = None
+        current_stage = None
+        
+        # Find the active stage for the current iteration step
         for stage_id, stage in enumerate(self.config.data_stages):
             stage = cast(DatasetStageArgs, stage)
+            
+            # Check if this stage should be active for the current iteration step
+            if stage.start_training_step <= self.iteration_step:
+                current_stage = stage
+                current_stage_id = stage_id
+            else:
+                break
 
-            if stage.start_training_step == self.iteration_step:
-                if self.current_dataloader is not None:
-                    prev_stage_name = self.config.data_stages[stage_id - 1].name
+        if current_stage is not None:
+            # Only switch dataloader when starting a new stage (exact match)
+            if current_stage.start_training_step == self.iteration_step:
+                if self.current_dataloader is not None and current_stage_id > 0:
+                    prev_stage_name = self.config.data_stages[current_stage_id - 1].name
                     prev_dataloader = dataloaders[prev_stage_name]
                     if isinstance(prev_dataloader, DataLoader):
                         # NOTE: we don't need to clear dummy data generator from memory
-                        clear_dataloader_from_memory(prev_dataloader, stage_name=stage.name)
+                        clear_dataloader_from_memory(prev_dataloader, stage_name=current_stage.name)
 
                 log_rank(
-                    f"[Training Stage: {stage.name}] Switching to a new dataset",
+                    f"[Training Stage: {current_stage.name}] Switching to a new dataset",
                     logger=logger,
                     level=logging.INFO,
                     rank=0,
                 )
 
-                dataloader = dataloaders[stage.name]
-                # NOTE: if a dataloader is lazy initialized, we need to call it to initialize it
-                dataloader = dataloader() if callable(dataloader) else dataloader
-                break
+            # Set dataloader for the current active stage
+            dataloader = dataloaders[current_stage.name]
+            # NOTE: if a dataloader is lazy initialized, we need to call it to initialize it
+            dataloader = dataloader() if callable(dataloader) else dataloader
 
         if dataloader is not None:
             self.current_dataloader = sanity_check_dataloader(
