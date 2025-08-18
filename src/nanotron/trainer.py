@@ -423,28 +423,6 @@ class DistributedTrainer:
                 dataloader = dataloader() if callable(dataloader) else dataloader
                 break
 
-        # If we didn't hit an exact stage start (common when resuming mid-stage),
-        # ensure we still initialize a valid dataloader.
-        if dataloader is None and self.current_dataloader is None:
-            # Pick the latest stage whose start step is <= current iteration; otherwise the earliest stage.
-            stages_sorted = sorted(self.config.data_stages, key=lambda s: cast(DatasetStageArgs, s).start_training_step)
-            eligible_stages = [
-                cast(DatasetStageArgs, s)
-                for s in stages_sorted
-                if cast(DatasetStageArgs, s).start_training_step <= self.iteration_step
-            ]
-            chosen_stage = eligible_stages[-1] if len(eligible_stages) > 0 else cast(DatasetStageArgs, stages_sorted[0])
-
-            log_rank(
-                f"[Training Stage: {chosen_stage.name}] Initializing dataset at iteration {self.iteration_step}",
-                logger=logger,
-                level=logging.INFO,
-                rank=0,
-            )
-
-            dataloader = dataloaders[chosen_stage.name]
-            dataloader = dataloader() if callable(dataloader) else dataloader
-
         if dataloader is not None:
             self.current_dataloader = sanity_check_dataloader(
                 dataloader=dataloader, parallel_context=self.parallel_context, config=self.config
