@@ -51,20 +51,20 @@ echo ""
 echo "Dataset generated successfully!"
 echo ""
 
-# Step 3: Update config with correct checkpoint path
-echo "Step 2: Updating configuration with checkpoint path..."
+# Step 3: Prepare checkpoint for finetuning (remove training metadata)
+echo "Step 2: Preparing checkpoint for finetuning..."
 echo "=========================================================="
 
-# Update the resume_checkpoint_path in the fresh config
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    sed -i '' "s|resume_checkpoint_path: .*|resume_checkpoint_path: $CHECKPOINT_PATH|g" passkey_finetune_300m_fresh_config.yaml
+WEIGHTS_ONLY_PATH="./checkpoints/fineweb_4gpu_300m_infini_weights_only"
+
+# Only prepare if not already done
+if [ ! -d "$WEIGHTS_ONLY_PATH" ]; then
+    echo "Creating weights-only checkpoint..."
+    bash prepare_checkpoint_for_finetune.sh "$CHECKPOINT_PATH" "$WEIGHTS_ONLY_PATH"
 else
-    # Linux
-    sed -i "s|resume_checkpoint_path: .*|resume_checkpoint_path: $CHECKPOINT_PATH|g" passkey_finetune_300m_fresh_config.yaml
+    echo "Weights-only checkpoint already exists at $WEIGHTS_ONLY_PATH"
 fi
 
-echo "Configuration updated with checkpoint: $CHECKPOINT_PATH"
 echo ""
 
 # Step 4: Run the finetuning
