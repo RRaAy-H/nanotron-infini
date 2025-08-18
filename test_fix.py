@@ -17,87 +17,30 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent / "src"))
 
 def create_test_config():
-    """Create minimal test config"""
-    config_content = '''general:
-  project: test_fix
-  run: test_dataloader_fix
-  seed: 42
-  step: 30000  # Simulate resuming from step 30000
-  ignore_sanity_checks: true
-
-infini_attention:
-  segment_length: 256
-  turn_on_memory: true
-  balance_factor_lr: 0.01
-  balance_act_type: hard_sigmoid
-  balance_init_type: zeros
-  logging: false
-  logging_interval: 1
-
-model:
-  dtype: bfloat16
-  init_method:
-    std: 0.03125
-  model_config:
-    bos_token_id: 1
-    eos_token_id: 2
-    hidden_act: silu
-    hidden_size: 32
-    intermediate_size: 128
-    num_hidden_layers: 1
-    is_llama_config: true
-    max_position_embeddings: 1024
-    num_attention_heads: 2
-    num_key_value_heads: 2
-    rms_norm_eps: 1.0e-05
-    vocab_size: 1000
-
-optimizer:
-  accumulate_grad_in_fp32: true
-  adam_beta1: 0.9
-  adam_beta2: 0.95
-  clip_grad: 1.0
-  learning_rate_scheduler:
-    learning_rate: 0.001
-    lr_warmup_steps: 1
-    lr_warmup_style: linear
-  weight_decay: 0.01
-  zero_stage: 0
-
-parallelism:
-  dp: 4
-  tp: 1
-  pp: 1
-  pp_engine: 1f1b
-
-tokenizer:
-  tokenizer_name_or_path: lvwerra/the-tokenizer-v1
-
-tokens:
-  micro_batch_size: 1
-  sequence_length: 512
-  train_steps: 30003  # Just 3 steps
-  batch_accumulation_per_replica: 1
-
-data_stages:
-  - name: "Test Stage"
-    start_training_step: 1  # Starts at 1, but we resume from 30000
-    data:
-      dataset: null  # Dummy data
-      seed: 42
-
-checkpoints:
-  checkpoints_path: ./test_checkpoints
-  resume_checkpoint_path: null
-  save_initial_state: false
-
-logging:
-  iteration_step_info_interval: 1
-  log_level: info'''
+    """Use existing working config but modify for testing"""
+    import yaml
     
-    with open("test_config.yaml", 'w') as f:
-        f.write(config_content)
-    return "test_config.yaml"
+    # Copy existing working config
+    with open("passkey_finetune_300m_simple_config.yaml", 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Modify for testing
+    config['general']['step'] = 30000  # Simulate resuming from step 30000
+    config['general']['project'] = 'test_fix'
+    config['general']['run'] = 'test_dataloader_fix'
+    config['tokens']['train_steps'] = 30003  # Just 3 steps
+    config['model']['model_config']['hidden_size'] = 32  # Smaller for speed
+    config['model']['model_config']['intermediate_size'] = 128
+    config['model']['model_config']['num_hidden_layers'] = 1
+    config['tokens']['sequence_length'] = 512
+    config['checkpoints']['checkpoints_path'] = './test_checkpoints'
+    config['checkpoints']['resume_checkpoint_path'] = None
+    
+    config_file = "test_config.yaml"
+    with open(config_file, 'w') as f:
+        yaml.dump(config, f, default_flow_style=False)
+    
+    return config_file
 
 def main():
     try:
