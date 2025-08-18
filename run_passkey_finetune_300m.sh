@@ -2,7 +2,7 @@ set -e  # Exit on error
 
 # Configuration
 CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/30000}" 
-NUM_EXAMPLES="${2:-3000}"
+NUM_EXAMPLES="${2:-3000}"  # Number of training examples to generate
 SEED="${3:-42}"
 
 echo "=========================================================="
@@ -55,16 +55,13 @@ echo ""
 echo "Step 2: Updating configuration with checkpoint path..."
 echo "=========================================================="
 
-# Create a temporary config with the correct checkpoint path
-cp passkey_finetune_300m_config.yaml passkey_finetune_300m_config_temp.yaml
-
-# Update the resume_checkpoint_path in the config
+# Update the resume_checkpoint_path in the fresh config
 if [[ "$OSTYPE" == "darwin"* ]]; then
     # macOS
-    sed -i '' "s|resume_checkpoint_path: .*|resume_checkpoint_path: $CHECKPOINT_PATH|g" passkey_finetune_300m_config_temp.yaml
+    sed -i '' "s|resume_checkpoint_path: .*|resume_checkpoint_path: $CHECKPOINT_PATH|g" passkey_finetune_300m_fresh_config.yaml
 else
     # Linux
-    sed -i "s|resume_checkpoint_path: .*|resume_checkpoint_path: $CHECKPOINT_PATH|g" passkey_finetune_300m_config_temp.yaml
+    sed -i "s|resume_checkpoint_path: .*|resume_checkpoint_path: $CHECKPOINT_PATH|g" passkey_finetune_300m_fresh_config.yaml
 fi
 
 echo "Configuration updated with checkpoint: $CHECKPOINT_PATH"
@@ -91,7 +88,7 @@ torchrun \
     --nproc_per_node=$NUM_GPUS \
     --rdzv_endpoint=localhost:29401 \
     run_train.py \
-    --config-file passkey_finetune_300m_config_temp.yaml
+    --config-file passkey_finetune_300m_fresh_config.yaml
 
 # Check if training completed
 if [ $? -eq 0 ]; then
@@ -100,18 +97,15 @@ if [ $? -eq 0 ]; then
     echo "FINETUNING COMPLETED SUCCESSFULLY!"
     echo "=========================================================="
     echo ""
-    echo "Checkpoints saved to: ./checkpoints/passkey_finetune_300m/"
+    echo "Checkpoints saved to: ./checkpoints/passkey_finetune_300m_fresh/"
     echo ""
     echo "Final checkpoint should be at step 500:"
-    ls -la ./checkpoints/passkey_finetune_300m/ 2>/dev/null || echo "Check the checkpoint directory"
-    
-    # Clean up temp config
-    rm passkey_finetune_300m_config_temp.yaml
+    ls -la ./checkpoints/passkey_finetune_300m_fresh/ 2>/dev/null || echo "Check the checkpoint directory"
     
     echo ""
     echo "Next steps:"
     echo "1. Evaluate the model using the passkey eval script:"
-    echo "   ./examples/infinite-context-length/scripts/run_passkey_eval_300m.sh ./checkpoints/passkey_finetune_300m/500 10240"
+    echo "   ./examples/infinite-context-length/scripts/run_passkey_eval_300m.sh ./checkpoints/passkey_finetune_300m_fresh/500 10240"
     echo ""
 
 else
