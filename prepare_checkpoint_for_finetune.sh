@@ -31,6 +31,20 @@ cp -r "$CHECKPOINT_PATH"/* "$OUTPUT_PATH/" 2>/dev/null || true
 echo "Removing training metadata..."
 rm -f "$OUTPUT_PATH/metadata.json"
 
+echo "Resetting step count in config.yaml..."
+if [ -f "$OUTPUT_PATH/config.yaml" ]; then
+    # Reset step and consumed_train_samples to null
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        sed -i '' 's/step: [0-9]*/step: null/g' "$OUTPUT_PATH/config.yaml"
+        sed -i '' 's/consumed_train_samples: [0-9]*/consumed_train_samples: null/g' "$OUTPUT_PATH/config.yaml"
+    else
+        # Linux
+        sed -i 's/step: [0-9]*/step: null/g' "$OUTPUT_PATH/config.yaml"
+        sed -i 's/consumed_train_samples: [0-9]*/consumed_train_samples: null/g' "$OUTPUT_PATH/config.yaml"
+    fi
+fi
+
 # Also remove optimizer and lr_scheduler states to save space
 echo "Removing optimizer and lr_scheduler states (keeping only model weights)..."
 rm -rf "$OUTPUT_PATH/optimizer" 2>/dev/null || true
