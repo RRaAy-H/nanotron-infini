@@ -95,7 +95,7 @@ tokens:
 # Data Configuration for Passkey Finetuning Dataset
 data_stages:
   - name: "Passkey Finetune Stage"
-    start_training_step: 1
+    start_training_step: 30001
     data:
       dataset:
         hf_dataset_or_datasets: "parquet"
@@ -112,6 +112,7 @@ data_stages:
 checkpoints:
   checkpoint_interval: 100
   checkpoints_path: ./checkpoints/passkey_finetune_300m
+  save_final_state: true
   checkpoints_path_is_shared_file_system: false
   resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
   save_initial_state: false
