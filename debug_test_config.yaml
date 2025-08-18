@@ -1,0 +1,122 @@
+# Debug test configuration designed to reproduce the dataloader issue
+# This config is identical to the original but with minimal resources for faster testing
+
+general:
+  benchmark_csv_path: null
+  consumed_train_samples: null
+  ignore_sanity_checks: true
+  project: debug_test
+  run: debug_dataloader_issue
+  seed: 42
+  step: 30000  # This simulates resuming from step 30000
+
+# Infini-Attention Configuration (minimal)
+infini_attention:
+  segment_length: 512  # Smaller for faster testing
+  turn_on_memory: true
+  balance_factor_lr: 0.01
+  balance_act_type: hard_sigmoid
+  balance_init_type: zeros
+  logging: true
+  logging_interval: 1  # Log every step for debugging
+  log_grad: false
+  log_segment_acts: false
+  balance_factor_weight_decay: 0.0
+
+# Model Configuration (very small for testing)
+model:
+  ddp_bucket_cap_mb: 25
+  dtype: bfloat16
+  init_method:
+    std: 0.03125
+  make_vocab_size_divisible_by: 1
+  model_config:
+    bos_token_id: 1
+    eos_token_id: 2
+    hidden_act: silu
+    initializer_range: 0.02
+    hidden_size: 64   # Very small
+    intermediate_size: 256
+    num_hidden_layers: 2  # Minimal
+    is_llama_config: true
+    max_position_embeddings: 2048
+    num_attention_heads: 2
+    num_key_value_heads: 2
+    pad_token_id: null
+    pretraining_tp: 1
+    rms_norm_eps: 1.0e-05
+    rope_scaling: null
+    tie_word_embeddings: false
+    use_cache: true
+    vocab_size: 1000  # Small vocab
+
+# Optimizer Configuration
+optimizer:
+  accumulate_grad_in_fp32: true
+  adam_beta1: 0.9
+  adam_beta2: 0.95
+  adam_eps: 1.0e-08
+  torch_adam_is_fused: false
+  clip_grad: 1.0
+  learning_rate_scheduler:
+    learning_rate: 0.0001
+    lr_decay_starting_step: null
+    lr_decay_steps: null
+    lr_decay_style: cosine
+    lr_warmup_steps: 1
+    lr_warmup_style: linear
+    min_decay_lr: 0.00001
+  weight_decay: 0.01
+  zero_stage: 0
+
+# Parallelism Configuration (single GPU)
+parallelism:
+  dp: 1  # Single GPU for debugging
+  tp: 1
+  expert_parallel_size: 1
+  pp: 1
+  pp_engine: 1f1b
+  tp_linear_async_communication: false
+  tp_mode: ALL_REDUCE
+
+# Tokenizer Configuration
+tokenizer:
+  tokenizer_max_length: null
+  tokenizer_name_or_path: lvwerra/the-tokenizer-v1
+  tokenizer_revision: null
+
+# Training Tokens Configuration
+tokens:
+  batch_accumulation_per_replica: 1
+  limit_test_batches: 0
+  limit_val_batches: 0
+  micro_batch_size: 1
+  sequence_length: 1024  # Smaller for faster testing
+  train_steps: 30002  # Just 2 steps after resume (30001, 30002)
+  val_check_interval: -1
+
+# Data Configuration - This reproduces the exact scenario
+data_stages:
+  - name: "Debug Test Stage"
+    start_training_step: 1  # Stage starts at 1, but we resume from 30000
+    data:
+      dataset: null  # Use dummy data to avoid data file dependencies
+      num_loading_workers: 1
+      seed: 42
+
+# Checkpoints Configuration
+checkpoints:
+  checkpoint_interval: 1
+  checkpoints_path: ./debug_test_checkpoints
+  checkpoints_path_is_shared_file_system: false
+  resume_checkpoint_path: null  # No actual resume needed for testing
+  save_initial_state: false
+
+# Logging Configuration
+logging:
+  iteration_step_info_interval: 1
+  log_level: info
+  log_level_replica: info
+
+# Profiler (disabled)
+profiler: null
