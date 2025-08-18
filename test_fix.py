@@ -25,7 +25,6 @@ def create_test_config():
         config = yaml.safe_load(f)
     
     # Modify for testing
-    config['general']['step'] = 30000  # Simulate resuming from step 30000
     config['general']['project'] = 'test_fix'
     config['general']['run'] = 'test_dataloader_fix'
     config['tokens']['train_steps'] = 30003  # Just 3 steps
@@ -60,9 +59,12 @@ def main():
         if dist.is_initialized():
             dist.barrier()
         
-        # Create trainer (this simulates resuming from step 30000)
+        # Create trainer
         trainer = DistributedTrainer(config_file)
         dataloader = get_dataloader(trainer)
+        
+        # Simulate resuming from step 30000 (like loading from checkpoint)
+        trainer.iteration_step = 30000
         
         if rank == 0:
             print(f"Initial state: iteration_step={trainer.iteration_step}")
@@ -71,7 +73,16 @@ def main():
         
         # This is where the original error occurred
         trainer.iteration_step += 1  # Now at step 30001
+        
+        if rank == 0:
+            print(f"Before update: current_dataloader = {trainer.current_dataloader}")
+            print(f"Available dataloaders: {list(dataloader.keys())}")
+            print(f"Data stages: {[(stage.name, stage.start_training_step) for stage in trainer.config.data_stages]}")
+        
         trainer._update_dataloader_based_on_training_stages(dataloader)
+        
+        if rank == 0:
+            print(f"After update: current_dataloader = {trainer.current_dataloader}")
         
         if trainer.current_dataloader is None:
             if rank == 0:
