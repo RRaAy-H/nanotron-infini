@@ -1,7 +1,7 @@
 general:
   benchmark_csv_path: null
-  consumed_train_samples: 120000  # Checkpoint already consumed 120000 samples (30000 steps * 4 batch_size)
-  ignore_sanity_checks: false
+  consumed_train_samples: null
+  ignore_sanity_checks: true  # Ignore sanity checks for resuming
   project: llama_300m_passkey_finetune
   run: 300m_passkey_10k_finetune
   seed: 42
@@ -94,8 +94,21 @@ tokens:
 
 # Data Configuration for Passkey Finetuning Dataset
 data_stages:
-  - name: "Passkey Finetune Stage"
-    start_training_step: 1  # Must start at 1, trainer will auto-skip to checkpoint step
+  - name: "Initial Stage (for framework requirement)"
+    start_training_step: 1
+    data:
+      dataset:
+        hf_dataset_or_datasets: "parquet"
+        hf_dataset_config_name: null
+        hf_dataset_splits: "train"
+        text_column_name: "prompt"
+        dataset_processing_num_proc_per_process: 48
+        dataset_overwrite_cache: false
+        data_files: "./passkey_finetune_data_10k.parquet"
+      num_loading_workers: 20
+      seed: 42
+  - name: "Passkey Finetune Stage (actual finetuning)"
+    start_training_step: 30001  # Start finetuning from step 30001
     data:
       dataset:
         hf_dataset_or_datasets: "parquet"
