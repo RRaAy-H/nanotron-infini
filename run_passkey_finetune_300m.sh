@@ -2,7 +2,7 @@ set -e  # Exit on error
 
 # Configuration
 CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/30000}" 
-NUM_EXAMPLES="${2:-2000}"  # Number of training examples to generate
+NUM_EXAMPLES="${2:-3000}"
 SEED="${3:-42}"
 
 echo "=========================================================="
@@ -70,37 +70,15 @@ echo "=========================================================="
 # Set environment variables
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export OMP_NUM_THREADS=16
+export CUDA_VISIBLE_DEVICES=4,5,6,7
 
-# Determine number of GPUs
-if command -v nvidia-smi &> /dev/null; then
-    NUM_GPUS=$(nvidia-smi --list-gpus | wc -l)
-    echo "Detected $NUM_GPUS GPUs"
-    
-    # Adjust parallelism if needed
-    if [ $NUM_GPUS -lt 4 ]; then
-        echo "WARNING: Config expects 4 GPUs but only $NUM_GPUS detected"
-        echo "You may need to adjust the 'dp' parameter in the config"
-        
-        # Update dp in config based on available GPUs
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            sed -i '' "s|dp: 4|dp: $NUM_GPUS|g" passkey_finetune_300m_config_temp.yaml
-        else
-            sed -i "s|dp: 4|dp: $NUM_GPUS|g" passkey_finetune_300m_config_temp.yaml
-        fi
-        echo "Updated config to use $NUM_GPUS GPUs"
-    fi
-else
-    NUM_GPUS=1
-    echo "nvidia-smi not found, assuming 1 GPU"
-fi
+NUM_GPUS=4
 
 # Create checkpoint directory
 mkdir -p ./checkpoints/passkey_finetune_300m
 
 # Run training
 echo "Running finetuning with $NUM_GPUS GPUs..."
-echo "Command: torchrun --nproc_per_node=$NUM_GPUS run_train.py --config-file passkey_finetune_300m_config_temp.yaml"
-echo ""
 
 torchrun \
     --nproc_per_node=$NUM_GPUS \
