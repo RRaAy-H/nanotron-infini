@@ -400,6 +400,8 @@ class DistributedTrainer:
             gc.collect()
 
         dataloader = None
+        
+        # Handle stage transitions (exact match for step)
         for stage_id, stage in enumerate(self.config.data_stages):
             stage = cast(DatasetStageArgs, stage)
 
@@ -422,6 +424,28 @@ class DistributedTrainer:
                 # NOTE: if a dataloader is lazy initialized, we need to call it to initialize it
                 dataloader = dataloader() if callable(dataloader) else dataloader
                 break
+        
+        # If no stage transition and current_dataloader is None (e.g., when resuming),
+        # find the currently active stage
+        if dataloader is None and self.current_dataloader is None:
+            # Find the stage with the highest start_training_step <= current iteration_step
+            active_stage = None
+            for stage in self.config.data_stages:
+                stage = cast(DatasetStageArgs, stage)
+                if stage.start_training_step <= self.iteration_step:
+                    if active_stage is None or stage.start_training_step > active_stage.start_training_step:
+                        active_stage = stage
+            
+            if active_stage is not None:
+                log_rank(
+                    f"[Training Stage: {active_stage.name}] Resuming with existing dataset (step {self.iteration_step})",
+                    logger=logger,
+                    level=logging.INFO,
+                    rank=0,
+                )
+                dataloader = dataloaders[active_stage.name]
+                # NOTE: if a dataloader is lazy initialized, we need to call it to initialize it
+                dataloader = dataloader() if callable(dataloader) else dataloader
 
         if dataloader is not None:
             self.current_dataloader = sanity_check_dataloader(
