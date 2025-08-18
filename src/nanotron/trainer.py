@@ -399,6 +399,13 @@ class DistributedTrainer:
 
             gc.collect()
 
+        # DEBUG: Add logging to diagnose the issue
+        print(f"[DEBUG] _update_dataloader_based_on_training_stages called:")
+        print(f"[DEBUG]   iteration_step = {self.iteration_step}")
+        print(f"[DEBUG]   current_dataloader before = {self.current_dataloader}")
+        print(f"[DEBUG]   available dataloaders = {list(dataloaders.keys())}")
+        print(f"[DEBUG]   data stages = {[(stage.name, stage.start_training_step) for stage in self.config.data_stages]}")
+        
         dataloader = None
         current_stage = None
         
@@ -410,7 +417,9 @@ class DistributedTrainer:
             if stage.start_training_step <= self.iteration_step:
                 current_stage = stage
                 current_stage_id = stage_id
+                print(f"[DEBUG]   Found active stage: {stage.name} (start_step={stage.start_training_step})")
             else:
+                print(f"[DEBUG]   Stage {stage.name} not active (start_step={stage.start_training_step} > {self.iteration_step})")
                 break
 
         if current_stage is not None:
@@ -439,6 +448,10 @@ class DistributedTrainer:
             self.current_dataloader = sanity_check_dataloader(
                 dataloader=dataloader, parallel_context=self.parallel_context, config=self.config
             )
+            print(f"[DEBUG]   Set current_dataloader = {self.current_dataloader}")
+        else:
+            print(f"[DEBUG]   No dataloader found! current_stage = {current_stage}")
+            print(f"[DEBUG]   current_dataloader remains = {self.current_dataloader}")
 
     def train(
         self,
@@ -494,6 +507,7 @@ class DistributedTrainer:
                 self._update_dataloader_based_on_training_stages(dataloader_or_dls)
 
                 # Training step
+                print(f"[DEBUG] About to call training_step with current_dataloader = {self.current_dataloader}")
                 outputs, loss_avg = self.training_step(dataloader=self.current_dataloader)
 
                 # Training Logs
@@ -583,6 +597,7 @@ class DistributedTrainer:
         if self.iteration_step < 5:
             log_memory(logger=logger)
 
+        print(f"[DEBUG] training_step: dataloader = {dataloader}, type = {type(dataloader)}")
         train_batches = (next(dataloader) for _ in range(self.n_micro_batches_per_batch))
         assert 1 == 1
 
