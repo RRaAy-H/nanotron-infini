@@ -25,19 +25,26 @@ fi
 
 # Step 2: Generate the passkey finetuning dataset
 echo ""
-echo "Step 1: Generating passkey finetuning dataset..."
+echo "Step 1: Checking/Generating passkey finetuning dataset..."
 echo "=========================================================="
 
-python generate_passkey_finetune_data.py \
-    --tokenizer_path lvwerra/the-tokenizer-v1 \
-    --num_examples $NUM_EXAMPLES \
-    --target_length 10240 \
-    --save_path ./passkey_finetune_data_10k \
-    --seed $SEED
+# Check if dataset already exists
+if [ -f "./passkey_finetune_data_10k.parquet" ]; then
+    echo "Dataset already exists at ./passkey_finetune_data_10k.parquet"
+    echo "Skipping dataset generation. Delete the file if you want to regenerate."
+else
+    echo "Generating new passkey finetuning dataset..."
+    python generate_passkey_finetune_data.py \
+        --tokenizer_path lvwerra/the-tokenizer-v1 \
+        --num_examples $NUM_EXAMPLES \
+        --target_length 10240 \
+        --save_path ./passkey_finetune_data_10k \
+        --seed $SEED
 
-if [ ! -f "./passkey_finetune_data_10k.parquet" ]; then
-    echo "ERROR: Dataset generation failed. Parquet file not found."
-    exit 1
+    if [ ! -f "./passkey_finetune_data_10k.parquet" ]; then
+        echo "ERROR: Dataset generation failed. Parquet file not found."
+        exit 1
+    fi
 fi
 
 echo ""
