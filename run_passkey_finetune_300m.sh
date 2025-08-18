@@ -51,23 +51,23 @@ echo ""
 echo "Dataset generated successfully!"
 echo ""
 
-# Step 3: Prepare checkpoint for finetuning (remove training metadata)
-echo "Step 2: Preparing checkpoint for finetuning..."
+# Step 3: Update config with checkpoint path
+echo "Step 2: Updating config with checkpoint path..."
 echo "=========================================================="
 
-WEIGHTS_ONLY_PATH="./checkpoints/fineweb_4gpu_300m_infini_weights_only"
-
-# Only prepare if not already done
-if [ ! -d "$WEIGHTS_ONLY_PATH" ]; then
-    echo "Creating weights-only checkpoint..."
-    bash prepare_checkpoint_for_finetune.sh "$CHECKPOINT_PATH" "$WEIGHTS_ONLY_PATH"
+# Update the resume_checkpoint_path in the config
+if [[ "$OSTYPE" == "darwin"* ]]; then
+    # macOS
+    sed -i '' "s|resume_checkpoint_path: .*|resume_checkpoint_path: $CHECKPOINT_PATH|g" passkey_finetune_300m_simple_config.yaml
 else
-    echo "Weights-only checkpoint already exists at $WEIGHTS_ONLY_PATH"
+    # Linux
+    sed -i "s|resume_checkpoint_path: .*|resume_checkpoint_path: $CHECKPOINT_PATH|g" passkey_finetune_300m_simple_config.yaml
 fi
 
+echo "Configuration updated with checkpoint: $CHECKPOINT_PATH"
 echo ""
 
-# Step 4: Run the finetuning
+# Step 3: Run the finetuning
 echo "Step 3: Starting finetuning..."
 echo "=========================================================="
 
@@ -88,7 +88,7 @@ torchrun \
     --nproc_per_node=$NUM_GPUS \
     --rdzv_endpoint=localhost:29401 \
     run_train.py \
-    --config-file passkey_finetune_300m_fresh_config.yaml
+    --config-file passkey_finetune_300m_simple_config.yaml
 
 # Check if training completed
 if [ $? -eq 0 ]; then
@@ -97,15 +97,15 @@ if [ $? -eq 0 ]; then
     echo "FINETUNING COMPLETED SUCCESSFULLY!"
     echo "=========================================================="
     echo ""
-    echo "Checkpoints saved to: ./checkpoints/passkey_finetune_300m_fresh/"
+    echo "Checkpoints saved to: ./checkpoints/passkey_finetune_300m_simple/"
     echo ""
-    echo "Final checkpoint should be at step 500:"
-    ls -la ./checkpoints/passkey_finetune_300m_fresh/ 2>/dev/null || echo "Check the checkpoint directory"
+    echo "Final checkpoint should be at step 30500:"
+    ls -la ./checkpoints/passkey_finetune_300m_simple/ 2>/dev/null || echo "Check the checkpoint directory"
     
     echo ""
     echo "Next steps:"
     echo "1. Evaluate the model using the passkey eval script:"
-    echo "   ./examples/infinite-context-length/scripts/run_passkey_eval_300m.sh ./checkpoints/passkey_finetune_300m_fresh/500 10240"
+    echo "   ./examples/infinite-context-length/scripts/run_passkey_eval_300m.sh ./checkpoints/passkey_finetune_300m_simple/30500 10240"
     echo ""
 
 else

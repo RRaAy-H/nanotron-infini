@@ -1,9 +1,9 @@
 general:
   benchmark_csv_path: null
   consumed_train_samples: null
-  ignore_sanity_checks: false
+  ignore_sanity_checks: true
   project: llama_300m_passkey_finetune
-  run: 300m_passkey_10k_finetune_fresh
+  run: 300m_passkey_10k_finetune_simple
   seed: 42
   step: null
 
@@ -89,31 +89,28 @@ tokens:
   limit_val_batches: 0
   micro_batch_size: 1
   sequence_length: 10240
-  train_steps: 500  # Just 500 finetuning steps
+  train_steps: 30500  # Continue from 30000 to 30500
   val_check_interval: -1
 
-# Data Configuration for Passkey Finetuning Dataset
-data_stages:
-  - name: "Passkey Finetune Stage"
-    start_training_step: 1
-    data:
-      dataset:
-        hf_dataset_or_datasets: "parquet"
-        hf_dataset_config_name: null
-        hf_dataset_splits: "train"
-        text_column_name: "prompt"
-        dataset_processing_num_proc_per_process: 48
-        dataset_overwrite_cache: false
-        data_files: "./passkey_finetune_data_10k.parquet"
-      num_loading_workers: 20
-      seed: 42
+# Data Configuration - Use HF dataset with automatic cycling
+data:
+  dataset:
+    hf_dataset_or_datasets: "parquet"
+    hf_dataset_config_name: null
+    hf_dataset_splits: "train"
+    text_column_name: "prompt"
+    dataset_processing_num_proc_per_process: 48
+    dataset_overwrite_cache: false
+    data_files: "./passkey_finetune_data_10k.parquet"
+  num_loading_workers: 20
+  seed: 42
 
 # Checkpoints Configuration
 checkpoints:
   checkpoint_interval: 100
-  checkpoints_path: ./checkpoints/passkey_finetune_300m_fresh
+  checkpoints_path: ./checkpoints/passkey_finetune_300m_simple
   checkpoints_path_is_shared_file_system: false
-  resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini_weights_only
+  resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
   save_initial_state: false
 
 # Logging Configuration
