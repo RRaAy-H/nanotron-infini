@@ -92,18 +92,21 @@ tokens:
   train_steps: 30500  # Continue from 30000 to 30500
   val_check_interval: -1
 
-# Data Configuration - Use HF dataset with automatic cycling
-data:
-  dataset:
-    hf_dataset_or_datasets: "parquet"
-    hf_dataset_config_name: null
-    hf_dataset_splits: "train"
-    text_column_name: "prompt"
-    dataset_processing_num_proc_per_process: 48
-    dataset_overwrite_cache: false
-    data_files: "./passkey_finetune_data_10k.parquet"
-  num_loading_workers: 20
-  seed: 42
+# Data Configuration - Use data_stages with single stage
+data_stages:
+  - name: "Passkey Finetune"
+    start_training_step: 1
+    data:
+      dataset:
+        hf_dataset_or_datasets: "parquet"
+        hf_dataset_config_name: null
+        hf_dataset_splits: "train"
+        text_column_name: "prompt"
+        dataset_processing_num_proc_per_process: 48
+        dataset_overwrite_cache: false
+        data_files: "./passkey_finetune_data_10k.parquet"
+      num_loading_workers: 20
+      seed: 42
 
 # Checkpoints Configuration
 checkpoints:
