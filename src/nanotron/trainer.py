@@ -498,7 +498,9 @@ class DistributedTrainer:
         constants.IS_RANK_TO_MONITOR = rank_to_monitor
 
         with prof:
+            print(f"[DEBUG] Starting training loop from step {self.start_iteration_step + 1} to {self.config.tokens.train_steps}")
             for self.iteration_step in range(self.start_iteration_step + 1, self.config.tokens.train_steps + 1):
+                print(f"[DEBUG] Training loop iteration: {self.iteration_step}")
                 constants.GLOBAL_STEP = self.iteration_step
 
                 if isinstance(prof, torch.profiler.profile):
