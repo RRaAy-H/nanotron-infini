@@ -16,7 +16,7 @@ infini_attention:
   balance_init_type: zeros
   logging: true
   logging_interval: 50 
-  log_grad: true
+  log_grad: false
   log_segment_acts: false
   balance_factor_weight_decay: 0.0
 
