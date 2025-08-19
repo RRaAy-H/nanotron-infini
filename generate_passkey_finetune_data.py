@@ -427,18 +427,27 @@ def generate_dataset(
         print("Skipping validation for maximum speed...")
     
     # Shuffle final examples
+    print("Shuffling examples...")
     random.shuffle(all_examples)
+    print("Shuffling complete.")
     
-    # Create dataset
+    # Create dataset dictionary
+    print("Creating dataset dictionary...")
     dataset_dict = {
         "prompt": [ex["prompt"] for ex in all_examples],
-        "answer": [ex["answer"] for ex in all_examples],
+        "answer": [ex["answer"] for ex in all_examples], 
         "depth_percent": [ex["depth_percent"] for ex in all_examples],
         "token_count": [ex["token_count"] for ex in all_examples],
         "passkey": [ex["passkey"] for ex in all_examples],
     }
+    print("Dataset dictionary created.")
     
-    return Dataset.from_dict(dataset_dict)
+    # Create HuggingFace Dataset
+    print("Creating HuggingFace Dataset object...")
+    dataset = Dataset.from_dict(dataset_dict)
+    print("Dataset object created.")
+    
+    return dataset
 
 
 def main():
