@@ -22,11 +22,13 @@ infini_attention:
 
 # Model Configuration
 model:
-  ddp_bucket_cap_mb: 25
+  ddp_bucket_cap_mb: 10  # Reduced for memory optimization
   dtype: bfloat16
   init_method:
     std: 0.03125  # 1/sqrt(1024)
   make_vocab_size_divisible_by: 1
+  # Memory optimization settings
+  use_gradient_checkpointing: true  # Enable gradient checkpointing to save memory
   model_config:
     bos_token_id: 1
     eos_token_id: 2
@@ -64,7 +66,7 @@ optimizer:
     lr_warmup_style: linear
     min_decay_lr: 0.000003
   weight_decay: 0.01
-  zero_stage: 0
+  zero_stage: 1  # Enable ZeRO stage 1 for memory optimization
 
 # Parallelism Configuration
 parallelism:
@@ -84,7 +86,7 @@ tokenizer:
 
 # Training Tokens Configuration - Optimized for 4x RTX 4090
 tokens:
-  batch_accumulation_per_replica: 1
+  batch_accumulation_per_replica: 4  # Increased to maintain effective batch size
   limit_test_batches: 0
   limit_val_batches: 10
   micro_batch_size: 1
