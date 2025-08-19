@@ -129,3 +129,6 @@ logging:
 # Profiler (disabled)
 profiler: null
 
+# Disable wandb logging
+wandb: null
+
