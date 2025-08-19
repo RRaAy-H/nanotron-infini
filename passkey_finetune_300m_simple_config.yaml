@@ -64,7 +64,7 @@ optimizer:
     lr_warmup_style: linear
     min_decay_lr: 0.000003
   weight_decay: 0.01
-  zero_stage: 1  # Enable ZeRO stage 1 for memory optimization
+  zero_stage: 0
 
 # Parallelism Configuration
 parallelism:
