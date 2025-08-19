@@ -135,10 +135,3 @@ logging:
 # Profiler (disabled)
 profiler: null
 
-# Early Stopping Configuration for Overfitting Prevention
-early_stopping:
-  enabled: true
-  patience: 3  # Stop if validation doesn't improve for 3 consecutive checks
-  min_delta: 0.001  # Minimum improvement threshold
-  monitor: "val_accuracy"  # Monitor validation accuracy
-  mode: "max"  # Stop when accuracy stops increasing
