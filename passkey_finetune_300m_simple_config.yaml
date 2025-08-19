@@ -56,14 +56,14 @@ optimizer:
   torch_adam_is_fused: false
   clip_grad: 1.0
   learning_rate_scheduler:
-    learning_rate: 0.00005
+    learning_rate: 0.000005
     lr_decay_starting_step: null
     lr_decay_steps: null
     lr_decay_style: cosine
     lr_warmup_steps: 50
     lr_warmup_style: linear
     min_decay_lr: 0.000005
-  weight_decay: 0.01
+  weight_decay: 0.1
   zero_stage: 0
 
 # Parallelism Configuration
@@ -89,7 +89,7 @@ tokens:
   limit_val_batches: 0
   micro_batch_size: 1
   sequence_length: 10240
-  train_steps: 30500  # Continue from 30000 to 30500
+  train_steps: 30400  # Continue from 30000 to 30400
   val_check_interval: -1
 
 # Data Configuration - Use data_stages with single stage

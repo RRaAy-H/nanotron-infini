@@ -65,7 +65,8 @@ def generate_passkey_example(
     if is_eval:
         question = "\nWhat is the pass key? The pass key is"
     else:
-        question = f"\nWhat is the pass key? The pass key is {passkey}."
+        # For training, don't include the answer - model should learn to retrieve it
+        question = "\nWhat is the pass key? The pass key is"
     
     # Calculate how much distractor text we need
     instruction_tokens = len(tokenizer.encode(instruction))
@@ -161,7 +162,7 @@ def generate_dataset(
                 passkey=passkey,
                 depth_percent=depth,
                 target_length=target_length,
-                is_eval=False  # Training data includes answer
+                is_eval=True  # Training data should NOT include answer - model learns to retrieve
             )
             
             examples.append(example)
@@ -238,14 +239,10 @@ def main():
         seed=args.seed
     )
     
-    # Save dataset
-    print(f"Saving dataset to {args.save_path}...")
-    dataset.save_to_disk(args.save_path)
-    
-    # Also save as parquet for easier loading
+    # Save dataset as parquet (the format used for training)
     parquet_path = f"{args.save_path}.parquet"
     dataset.to_parquet(parquet_path)
-    print(f"Also saved as parquet: {parquet_path}")
+    print(f"Saved dataset as parquet: {parquet_path}")
     
     # Print statistics
     print("\nDataset Statistics:")
