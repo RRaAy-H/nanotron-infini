@@ -1,3 +1,11 @@
+# ABSOLUTE FIRST DEBUG - PROVE THIS FILE IS LOADED
+print("=" * 80, flush=True)
+print("CRITICAL DEBUG: TRAINER.PY FILE IS BEING LOADED", flush=True)  
+print("=" * 80, flush=True)
+import sys
+sys.stderr.write("STDERR: TRAINER.PY LOADED\n")
+sys.stderr.flush()
+
 import datetime
 import json
 import os
