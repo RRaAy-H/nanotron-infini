@@ -46,9 +46,6 @@ model:
     tie_word_embeddings: false
     use_cache: true
     vocab_size: 49152
-    # Regularization for fine-tuning
-    attention_dropout: 0.1
-    hidden_dropout: 0.1
 
 # Optimizer Configuration
 optimizer:
