@@ -10,6 +10,17 @@ import random
 from pathlib import Path
 from typing import List, Dict
 import os
+import multiprocessing as mp
+import time
+from tqdm import tqdm
+import functools
+
+try:
+    import torch
+    TORCH_AVAILABLE = True
+except ImportError:
+    TORCH_AVAILABLE = False
+    torch = None
 
 from datasets import Dataset
 from transformers import AutoTokenizer
@@ -37,7 +48,8 @@ def generate_passkey_example(
     passkey: int,
     depth_percent: float,
     target_length: int = 10240,
-    is_eval: bool = False
+    is_eval: bool = False,
+    gpu_device: str = None
 ) -> Dict[str, any]:
     """
     Generate a single passkey retrieval example.
@@ -67,6 +79,14 @@ def generate_passkey_example(
     else:
         # For training, don't include the answer - model should learn to retrieve it
         question = "\nWhat is the pass key? The pass key is"
+    
+    # Move tokenizer to GPU if available and specified
+    if gpu_device and TORCH_AVAILABLE and torch.cuda.is_available():
+        try:
+            if hasattr(tokenizer, 'to'):
+                tokenizer.to(gpu_device)
+        except Exception:
+            pass  # Fallback to CPU tokenization
     
     # Calculate how much distractor text we need
     instruction_tokens = len(tokenizer.encode(instruction))
@@ -118,33 +138,108 @@ def generate_passkey_example(
     }
 
 
+def generate_examples_chunk(args_tuple):
+    """
+    Generate a chunk of examples in parallel worker process.
+    """
+    (
+        tokenizer_path,
+        chunk_passkeys,
+        chunk_depths,
+        target_length,
+        worker_seed,
+        gpu_devices,
+        worker_id
+    ) = args_tuple
+    
+    # Set random seed for this worker
+    random.seed(worker_seed)
+    
+    # Load tokenizer in worker
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+    
+    # Determine GPU device for this worker
+    gpu_device = None
+    if gpu_devices and TORCH_AVAILABLE and torch.cuda.is_available():
+        try:
+            gpu_id = gpu_devices[worker_id % len(gpu_devices)]
+            gpu_device = f"cuda:{gpu_id}"
+            # Test if GPU is accessible
+            torch.cuda.set_device(gpu_id)
+            torch.cuda.empty_cache()
+        except Exception:
+            gpu_device = None  # Fallback to CPU
+    
+    examples = []
+    for passkey, depth in zip(chunk_passkeys, chunk_depths):
+        example = generate_passkey_example(
+            tokenizer=tokenizer,
+            passkey=passkey,
+            depth_percent=depth,
+            target_length=target_length,
+            is_eval=True,
+            gpu_device=gpu_device
+        )
+        examples.append(example)
+    
+    return examples
+
+
 def generate_dataset(
-    tokenizer,
+    tokenizer_path: str,
     num_examples: int = 2000,
     target_length: int = 10240,
-    seed: int = 42
+    seed: int = 42,
+    num_workers: int = 128,
+    gpu_devices: List[int] = None
 ) -> Dataset:
     """
-    Generate full passkey retrieval dataset.
+    Generate full passkey retrieval dataset using parallel processing.
     
     Args:
-        tokenizer: Tokenizer to use
+        tokenizer_path: Path to tokenizer
         num_examples: Total number of examples to generate
         target_length: Target sequence length in tokens
         seed: Random seed for reproducibility
+        num_workers: Number of parallel workers
+        gpu_devices: List of GPU device IDs to use
     
     Returns:
         HuggingFace Dataset object
     """
     random.seed(seed)
     
+    # Log GPU configuration
+    if gpu_devices and TORCH_AVAILABLE and torch.cuda.is_available():
+        try:
+            # Test GPU accessibility
+            for gpu_id in gpu_devices:
+                torch.cuda.set_device(gpu_id)
+                torch.cuda.empty_cache()
+            print(f"GPU tokenization: ENABLED (using cuda:{','.join(map(str, gpu_devices))})")
+            print(f"Worker distribution: {num_workers // len(gpu_devices)} workers per GPU")
+        except Exception as e:
+            print(f"GPU tokenization: DISABLED (falling back to CPU) - Error: {e}")
+            gpu_devices = None
+    else:
+        if not TORCH_AVAILABLE:
+            print("GPU tokenization: DISABLED (PyTorch not available)")
+        elif not gpu_devices:
+            print("GPU tokenization: DISABLED (no GPU devices specified)")
+        else:
+            print("GPU tokenization: DISABLED (CUDA not available)")
+        gpu_devices = None
+    
+    print(f"Starting parallel generation with {num_workers} workers...")
+    
     # Define depth percentages to cover
     depth_percentages = [0, 25, 50, 75, 100]
     
-    examples = []
+    # Generate all passkeys and depths first
+    all_passkeys = []
+    all_depths = []
     used_passkeys = set()
     
-    # Generate examples evenly distributed across depths
     examples_per_depth = num_examples // len(depth_percentages)
     
     for depth in depth_percentages:
@@ -155,20 +250,54 @@ def generate_dataset(
                 if passkey not in used_passkeys:
                     used_passkeys.add(passkey)
                     break
-            
-            # Generate example
-            example = generate_passkey_example(
-                tokenizer=tokenizer,
-                passkey=passkey,
-                depth_percent=depth,
-                target_length=target_length,
-                is_eval=True  # Training data should NOT include answer - model learns to retrieve
-            )
-            
-            examples.append(example)
+            all_passkeys.append(passkey)
+            all_depths.append(depth)
     
-    # Shuffle examples
-    random.shuffle(examples)
+    # Shuffle for better load distribution
+    combined = list(zip(all_passkeys, all_depths))
+    random.shuffle(combined)
+    all_passkeys, all_depths = zip(*combined)
+    
+    # Split work into chunks for parallel processing
+    chunk_size = max(1, len(all_passkeys) // num_workers)
+    chunks = []
+    
+    for i in range(0, len(all_passkeys), chunk_size):
+        chunk_passkeys = all_passkeys[i:i + chunk_size]
+        chunk_depths = all_depths[i:i + chunk_size]
+        worker_seed = seed + i  # Different seed per chunk
+        worker_id = len(chunks)
+        
+        chunks.append((
+            tokenizer_path,
+            chunk_passkeys,
+            chunk_depths,
+            target_length,
+            worker_seed,
+            gpu_devices,
+            worker_id
+        ))
+    
+    # Process chunks in parallel
+    start_time = time.time()
+    
+    with mp.Pool(processes=num_workers) as pool:
+        # Use tqdm for progress bar
+        chunk_results = list(tqdm(
+            pool.imap(generate_examples_chunk, chunks),
+            total=len(chunks),
+            desc=f"Generating {num_examples} examples",
+            unit="chunk"
+        ))
+    
+    # Flatten results
+    examples = []
+    for chunk_examples in chunk_results:
+        examples.extend(chunk_examples)
+    
+    generation_time = time.time() - start_time
+    print(f"Generation completed in {generation_time:.1f} seconds")
+    print(f"Speed: {len(examples) / generation_time:.1f} examples/second")
     
     # Create dataset
     dataset_dict = {
@@ -193,7 +322,7 @@ def main():
     parser.add_argument(
         "--num_examples",
         type=int,
-        default=2000,
+        default=20000,
         help="Number of examples to generate"
     )
     parser.add_argument(
@@ -225,18 +354,48 @@ def main():
         default="your-username/passkey-finetune-10k",
         help="HuggingFace Hub repository name"
     )
+    parser.add_argument(
+        "--num_workers",
+        type=int,
+        default=128,
+        help="Number of parallel workers"
+    )
+    parser.add_argument(
+        "--gpu_devices",
+        type=str,
+        default="4,5,6,7",
+        help="Comma-separated GPU device IDs (e.g., '4,5,6,7')"
+    )
+    parser.add_argument(
+        "--disable_gpu",
+        action="store_true",
+        help="Force CPU-only mode"
+    )
     
     args = parser.parse_args()
     
+    # Parse GPU devices
+    gpu_devices = None
+    if not args.disable_gpu and args.gpu_devices:
+        try:
+            gpu_devices = [int(x.strip()) for x in args.gpu_devices.split(',')]
+            print(f"GPU devices specified: {gpu_devices}")
+        except ValueError:
+            print(f"Invalid GPU devices format: {args.gpu_devices}")
+            gpu_devices = None
+    
     print(f"Loading tokenizer from {args.tokenizer_path}...")
+    # Test tokenizer loading
     tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_path)
     
     print(f"Generating {args.num_examples} examples with ~{args.target_length} tokens each...")
     dataset = generate_dataset(
-        tokenizer=tokenizer,
+        tokenizer_path=args.tokenizer_path,
         num_examples=args.num_examples,
         target_length=args.target_length,
-        seed=args.seed
+        seed=args.seed,
+        num_workers=args.num_workers,
+        gpu_devices=gpu_devices
     )
     
     # Save dataset as parquet (the format used for training)
