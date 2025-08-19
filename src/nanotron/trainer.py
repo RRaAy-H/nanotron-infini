@@ -1,12 +1,5 @@
-# ABSOLUTE FIRST DEBUG - PROVE THIS FILE IS LOADED
-print("=" * 80, flush=True)
-print("CRITICAL DEBUG: TRAINER.PY FILE IS BEING LOADED", flush=True)  
-print("=" * 80, flush=True)
-import sys
-sys.stderr.write("STDERR: TRAINER.PY LOADED\n")
-sys.stderr.flush()
-
 import datetime
+import sys
 import json
 import os
 import shutil
@@ -370,14 +363,8 @@ class DistributedTrainer:
     def _update_dataloader_based_on_training_stages(self, dataloaders):
         from collections.abc import Generator
 
-        # DEBUG: Add logging to see what's happening in real script
-        print(f"[DEBUG] _update_dataloader_based_on_training_stages: iteration_step={self.iteration_step}")
-        print(f"[DEBUG]   dataloaders type: {type(dataloaders)}")
-        print(f"[DEBUG]   dataloaders: {dataloaders if not isinstance(dataloaders, dict) else list(dataloaders.keys())}")
-        print(f"[DEBUG]   current_dataloader before: {self.current_dataloader}")
 
         if not hasattr(self.config, "data_stages") or self.config.data_stages is None:
-            print(f"[DEBUG] No data_stages - using simple dataloader logic")
             if self.current_dataloader is None:
                 if isinstance(dataloaders, tuple):
                     dataloader = dataloaders[0]
@@ -390,12 +377,9 @@ class DistributedTrainer:
         elif isinstance(dataloaders, Generator):
             # TODO(xrsrke): this is a hacky way to handle DoReMi's dataloader
             # remove this in the next PR
-            print(f"[DEBUG] Generator dataloader - using as-is")
             self.current_dataloader = dataloaders
             return
 
-        print(f"[DEBUG] Using data_stages logic")
-        print(f"[DEBUG]   data_stages: {[(stage.name, stage.start_training_step) for stage in self.config.data_stages]}")
 
         assert len(dataloaders) > 0, "No dataloaders provided"
         assert len(dataloaders) == len(
@@ -432,12 +416,10 @@ class DistributedTrainer:
             else:
                 break
 
-        print(f"[DEBUG] Found active stage: {current_stage.name if current_stage else None}")
         
         if current_stage is not None:
             # Only switch dataloader when starting a new stage (exact match)
             if current_stage.start_training_step == self.iteration_step:
-                print(f"[DEBUG] Exact match - switching to new dataset")
                 if self.current_dataloader is not None and current_stage_id > 0:
                     prev_stage_name = self.config.data_stages[current_stage_id - 1].name
                     prev_dataloader = dataloaders[prev_stage_name]
@@ -452,25 +434,19 @@ class DistributedTrainer:
                     rank=0,
                 )
             else:
-                print(f"[DEBUG] Not exact match - continuing with active stage")
 
             # Set dataloader for the current active stage
-            print(f"[DEBUG] Setting dataloader from stage: {current_stage.name}")
             dataloader = dataloaders[current_stage.name]
             # NOTE: if a dataloader is lazy initialized, we need to call it to initialize it
             dataloader = dataloader() if callable(dataloader) else dataloader
         else:
-            print(f"[DEBUG] No active stage found!")
 
-        print(f"[DEBUG] Final dataloader: {dataloader}")
 
         if dataloader is not None:
             self.current_dataloader = sanity_check_dataloader(
                 dataloader=dataloader, parallel_context=self.parallel_context, config=self.config
             )
-            print(f"[DEBUG] Set current_dataloader: {self.current_dataloader}")
         else:
-            print(f"[DEBUG] No dataloader to set - current_dataloader remains: {self.current_dataloader}")
 
     def train(
         self,
@@ -480,11 +456,7 @@ class DistributedTrainer:
         **kwargs,
     ) -> None:
         import sys
-        print(f"[DEBUG] train() method started", flush=True)
-        sys.stdout.flush()
         self.pre_training(**kwargs)
-        print(f"[DEBUG] pre_training completed", flush=True)
-        sys.stdout.flush()
 
         if self.config.checkpoints.save_initial_state and self.init_checkpoint_path is None:
             self.save_checkpoint()
@@ -511,15 +483,8 @@ class DistributedTrainer:
         constants.IS_RANK_TO_MONITOR = rank_to_monitor
 
         with prof:
-            print(f"[DEBUG] Starting training loop from step {self.start_iteration_step + 1} to {self.config.tokens.train_steps}")
-            import sys
-            sys.stderr.write(f"STDERR DEBUG: About to start training loop\n")
-            sys.stderr.flush()
             
             for self.iteration_step in range(self.start_iteration_step + 1, self.config.tokens.train_steps + 1):
-                print(f"[DEBUG] Training loop iteration: {self.iteration_step}")
-                sys.stderr.write(f"STDERR DEBUG: Training loop iteration: {self.iteration_step}\n")
-                sys.stderr.flush()
                 constants.GLOBAL_STEP = self.iteration_step
 
                 if isinstance(prof, torch.profiler.profile):
@@ -536,15 +501,9 @@ class DistributedTrainer:
                     )
 
                 self.iteration_start_time = time.time()
-                print(f"[DEBUG] About to call _update_dataloader_based_on_training_stages")
-                sys.stderr.write(f"STDERR DEBUG: About to call _update_dataloader_based_on_training_stages\n")
-                sys.stderr.flush()
                 self._update_dataloader_based_on_training_stages(dataloader_or_dls)
 
                 # Training step
-                print(f"[DEBUG] About to call training_step with current_dataloader: {self.current_dataloader}")
-                sys.stderr.write(f"STDERR DEBUG: About to call training_step with current_dataloader: {self.current_dataloader}\n") 
-                sys.stderr.flush()
                 outputs, loss_avg = self.training_step(dataloader=self.current_dataloader)
 
                 # Training Logs
