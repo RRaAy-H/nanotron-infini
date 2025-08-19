@@ -434,19 +434,21 @@ class DistributedTrainer:
                     rank=0,
                 )
             else:
+                pass
 
             # Set dataloader for the current active stage
             dataloader = dataloaders[current_stage.name]
             # NOTE: if a dataloader is lazy initialized, we need to call it to initialize it
             dataloader = dataloader() if callable(dataloader) else dataloader
         else:
-
+            pass
 
         if dataloader is not None:
             self.current_dataloader = sanity_check_dataloader(
                 dataloader=dataloader, parallel_context=self.parallel_context, config=self.config
             )
         else:
+            pass
 
     def train(
         self,
