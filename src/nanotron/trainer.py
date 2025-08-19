@@ -471,7 +471,12 @@ class DistributedTrainer:
         ],
         **kwargs,
     ) -> None:
+        import sys
+        print(f"[DEBUG] train() method started", flush=True)
+        sys.stdout.flush()
         self.pre_training(**kwargs)
+        print(f"[DEBUG] pre_training completed", flush=True)
+        sys.stdout.flush()
 
         if self.config.checkpoints.save_initial_state and self.init_checkpoint_path is None:
             self.save_checkpoint()
@@ -499,8 +504,14 @@ class DistributedTrainer:
 
         with prof:
             print(f"[DEBUG] Starting training loop from step {self.start_iteration_step + 1} to {self.config.tokens.train_steps}")
+            import sys
+            sys.stderr.write(f"STDERR DEBUG: About to start training loop\n")
+            sys.stderr.flush()
+            
             for self.iteration_step in range(self.start_iteration_step + 1, self.config.tokens.train_steps + 1):
                 print(f"[DEBUG] Training loop iteration: {self.iteration_step}")
+                sys.stderr.write(f"STDERR DEBUG: Training loop iteration: {self.iteration_step}\n")
+                sys.stderr.flush()
                 constants.GLOBAL_STEP = self.iteration_step
 
                 if isinstance(prof, torch.profiler.profile):
@@ -517,9 +528,15 @@ class DistributedTrainer:
                     )
 
                 self.iteration_start_time = time.time()
+                print(f"[DEBUG] About to call _update_dataloader_based_on_training_stages")
+                sys.stderr.write(f"STDERR DEBUG: About to call _update_dataloader_based_on_training_stages\n")
+                sys.stderr.flush()
                 self._update_dataloader_based_on_training_stages(dataloader_or_dls)
 
                 # Training step
+                print(f"[DEBUG] About to call training_step with current_dataloader: {self.current_dataloader}")
+                sys.stderr.write(f"STDERR DEBUG: About to call training_step with current_dataloader: {self.current_dataloader}\n") 
+                sys.stderr.flush()
                 outputs, loss_avg = self.training_step(dataloader=self.current_dataloader)
 
                 # Training Logs
