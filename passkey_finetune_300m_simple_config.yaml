@@ -11,7 +11,7 @@ general:
 infini_attention:
   segment_length: 1024
   turn_on_memory: true
-  balance_factor_lr: 0.001
+  balance_factor_lr: 0.01
   balance_act_type: hard_sigmoid
   balance_init_type: zeros
   logging: true
@@ -56,13 +56,13 @@ optimizer:
   torch_adam_is_fused: false
   clip_grad: 1.0
   learning_rate_scheduler:
-    learning_rate: 0.0001 
-    lr_decay_starting_step: 500
-    lr_decay_steps: 1
-    lr_decay_style: linear
-    lr_warmup_steps: 0
+    learning_rate: 0.00006
+    lr_decay_starting_step: null
+    lr_decay_steps: null
+    lr_decay_style: cosine
+    lr_warmup_steps: 50  
     lr_warmup_style: linear
-    min_decay_lr: 0.0001
+    min_decay_lr: 0.000003
   weight_decay: 0.01
   zero_stage: 0
 
