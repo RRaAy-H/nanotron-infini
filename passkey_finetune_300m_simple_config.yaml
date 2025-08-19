@@ -84,10 +84,10 @@ tokenizer:
 
 # Training Tokens Configuration - For passkey finetuning
 tokens:
-  batch_accumulation_per_replica: 2
+  batch_accumulation_per_replica: 4
   limit_test_batches: 0
   limit_val_batches: 0
-  micro_batch_size: 4
+  micro_batch_size: 1
   sequence_length: 10240
   train_steps: 30400  # Continue from 30000 to 30400
   val_check_interval: -1
