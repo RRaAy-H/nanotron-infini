@@ -442,10 +442,36 @@ def generate_dataset(
     }
     print("Dataset dictionary created.")
     
-    # Create HuggingFace Dataset
-    print("Creating HuggingFace Dataset object...")
-    dataset = Dataset.from_dict(dataset_dict)
-    print("Dataset object created.")
+    # Create HuggingFace Dataset with optimizations for large text data
+    print("Creating HuggingFace Dataset object (optimized for large text)...")
+    try:
+        # Try fast creation without data validation/optimization
+        dataset = Dataset.from_dict(dataset_dict, features=None)
+        print("Dataset object created successfully.")
+    except Exception as e:
+        print(f"Fast dataset creation failed: {e}")
+        print("Trying alternative approach...")
+        # Fallback: Create smaller chunks and combine
+        chunk_size = 5000
+        datasets = []
+        for i in range(0, len(all_examples), chunk_size):
+            chunk_examples = all_examples[i:i + chunk_size]
+            chunk_dict = {
+                "prompt": [ex["prompt"] for ex in chunk_examples],
+                "answer": [ex["answer"] for ex in chunk_examples],
+                "depth_percent": [ex["depth_percent"] for ex in chunk_examples],
+                "token_count": [ex["token_count"] for ex in chunk_examples],
+                "passkey": [ex["passkey"] for ex in chunk_examples],
+            }
+            chunk_dataset = Dataset.from_dict(chunk_dict)
+            datasets.append(chunk_dataset)
+            print(f"Created chunk {len(datasets)}/{(len(all_examples) + chunk_size - 1) // chunk_size}")
+        
+        # Concatenate chunks
+        print("Concatenating dataset chunks...")
+        from datasets import concatenate_datasets
+        dataset = concatenate_datasets(datasets)
+        print("Dataset chunks concatenated.")
     
     return dataset
 
