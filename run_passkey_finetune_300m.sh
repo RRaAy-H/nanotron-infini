@@ -84,6 +84,10 @@ mkdir -p ./checkpoints/passkey_finetune_300m
 # Run training
 echo "Running finetuning with $NUM_GPUS GPUs..."
 
+# Set Python path to use the current directory's src
+export PYTHONPATH="$(pwd)/src:$PYTHONPATH"
+echo "Using PYTHONPATH: $PYTHONPATH"
+
 torchrun \
     --nproc_per_node=$NUM_GPUS \
     --rdzv_endpoint=localhost:29401 \
