@@ -11,7 +11,6 @@ echo "=========================================================="
 echo "Base checkpoint: $CHECKPOINT_PATH"
 echo "Training examples: $NUM_EXAMPLES"
 echo "Sequence length: 10240 tokens (~10K)"
-echo "Training steps: 500"
 echo "Seed: $SEED"
 echo "=========================================================="
 
