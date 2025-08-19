@@ -359,10 +359,17 @@ class DistributedTrainer:
             )
             log_rank(full_log_message, logger=logger, level=logging.INFO, rank=0)
 
-    def _update_dataloader_based_on_training_stages(self, dataloaders: Union[List[DataLoader], DataLoader]):
+    def _update_dataloader_based_on_training_stages(self, dataloaders):
         from collections.abc import Generator
 
+        # DEBUG: Add logging to see what's happening in real script
+        print(f"[DEBUG] _update_dataloader_based_on_training_stages: iteration_step={self.iteration_step}")
+        print(f"[DEBUG]   dataloaders type: {type(dataloaders)}")
+        print(f"[DEBUG]   dataloaders: {dataloaders if not isinstance(dataloaders, dict) else list(dataloaders.keys())}")
+        print(f"[DEBUG]   current_dataloader before: {self.current_dataloader}")
+
         if not hasattr(self.config, "data_stages") or self.config.data_stages is None:
+            print(f"[DEBUG] No data_stages - using simple dataloader logic")
             if self.current_dataloader is None:
                 if isinstance(dataloaders, tuple):
                     dataloader = dataloaders[0]
@@ -375,8 +382,12 @@ class DistributedTrainer:
         elif isinstance(dataloaders, Generator):
             # TODO(xrsrke): this is a hacky way to handle DoReMi's dataloader
             # remove this in the next PR
+            print(f"[DEBUG] Generator dataloader - using as-is")
             self.current_dataloader = dataloaders
             return
+
+        print(f"[DEBUG] Using data_stages logic")
+        print(f"[DEBUG]   data_stages: {[(stage.name, stage.start_training_step) for stage in self.config.data_stages]}")
 
         assert len(dataloaders) > 0, "No dataloaders provided"
         assert len(dataloaders) == len(
@@ -399,13 +410,6 @@ class DistributedTrainer:
 
             gc.collect()
 
-        # DEBUG: Add logging to diagnose the issue
-        print(f"[DEBUG] _update_dataloader_based_on_training_stages called:")
-        print(f"[DEBUG]   iteration_step = {self.iteration_step}")
-        print(f"[DEBUG]   current_dataloader before = {self.current_dataloader}")
-        print(f"[DEBUG]   available dataloaders = {list(dataloaders.keys())}")
-        print(f"[DEBUG]   data stages = {[(stage.name, stage.start_training_step) for stage in self.config.data_stages]}")
-        
         dataloader = None
         current_stage = None
         
@@ -417,14 +421,15 @@ class DistributedTrainer:
             if stage.start_training_step <= self.iteration_step:
                 current_stage = stage
                 current_stage_id = stage_id
-                print(f"[DEBUG]   Found active stage: {stage.name} (start_step={stage.start_training_step})")
             else:
-                print(f"[DEBUG]   Stage {stage.name} not active (start_step={stage.start_training_step} > {self.iteration_step})")
                 break
 
+        print(f"[DEBUG] Found active stage: {current_stage.name if current_stage else None}")
+        
         if current_stage is not None:
             # Only switch dataloader when starting a new stage (exact match)
             if current_stage.start_training_step == self.iteration_step:
+                print(f"[DEBUG] Exact match - switching to new dataset")
                 if self.current_dataloader is not None and current_stage_id > 0:
                     prev_stage_name = self.config.data_stages[current_stage_id - 1].name
                     prev_dataloader = dataloaders[prev_stage_name]
@@ -438,20 +443,26 @@ class DistributedTrainer:
                     level=logging.INFO,
                     rank=0,
                 )
+            else:
+                print(f"[DEBUG] Not exact match - continuing with active stage")
 
             # Set dataloader for the current active stage
+            print(f"[DEBUG] Setting dataloader from stage: {current_stage.name}")
             dataloader = dataloaders[current_stage.name]
             # NOTE: if a dataloader is lazy initialized, we need to call it to initialize it
             dataloader = dataloader() if callable(dataloader) else dataloader
+        else:
+            print(f"[DEBUG] No active stage found!")
+
+        print(f"[DEBUG] Final dataloader: {dataloader}")
 
         if dataloader is not None:
             self.current_dataloader = sanity_check_dataloader(
                 dataloader=dataloader, parallel_context=self.parallel_context, config=self.config
             )
-            print(f"[DEBUG]   Set current_dataloader = {self.current_dataloader}")
+            print(f"[DEBUG] Set current_dataloader: {self.current_dataloader}")
         else:
-            print(f"[DEBUG]   No dataloader found! current_stage = {current_stage}")
-            print(f"[DEBUG]   current_dataloader remains = {self.current_dataloader}")
+            print(f"[DEBUG] No dataloader to set - current_dataloader remains: {self.current_dataloader}")
 
     def train(
         self,
@@ -507,7 +518,6 @@ class DistributedTrainer:
                 self._update_dataloader_based_on_training_stages(dataloader_or_dls)
 
                 # Training step
-                print(f"[DEBUG] About to call training_step with current_dataloader = {self.current_dataloader}")
                 outputs, loss_avg = self.training_step(dataloader=self.current_dataloader)
 
                 # Training Logs
@@ -597,7 +607,6 @@ class DistributedTrainer:
         if self.iteration_step < 5:
             log_memory(logger=logger)
 
-        print(f"[DEBUG] training_step: dataloader = {dataloader}, type = {type(dataloader)}")
         train_batches = (next(dataloader) for _ in range(self.n_micro_batches_per_batch))
         assert 1 == 1
 
