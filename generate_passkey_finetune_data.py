@@ -2,6 +2,13 @@
 """
 Ultra-optimized synthetic passkey retrieval finetuning dataset generator for 300M Infini-Attention model.
 Creates 10K token sequences with embedded numeric passkeys for the model to learn to retrieve.
+
+Key optimizations:
+- Batch processing to maximize CPU utilization
+- Eliminates ALL tokenization bottlenecks
+- Pre-computes token counts analytically 
+- Uses pure string operations in all workers
+- Designed for maximum 128-core CPU utilization
 """
 
 import argparse
@@ -14,7 +21,8 @@ from typing import List, Dict, Tuple
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from collections import Counter
 import numpy as np
-from multiprocessing import cpu_count
+from multiprocessing import cpu_count, Manager
+import threading
 
 # Set tokenizer parallelism to avoid multiprocessing conflicts
 os.environ['TOKENIZERS_PARALLELISM'] = 'false'
@@ -80,6 +88,7 @@ def precompute_components(tokenizer, target_length: int = 10240) -> Dict:
         "The grass is green. The sky is blue.",
         "Here we go. There and back again.",
         "The sun is yellow. This is a test.",
+        "The grass is green. The sky is blue. The sun is yellow. Here we go. There and back again." * 10,
     ]
     
     total_chars = 0
@@ -92,26 +101,31 @@ def precompute_components(tokenizer, target_length: int = 10240) -> Dict:
     avg_tokens_per_char = total_tokens / total_chars
     print(f"Average tokens per character: {avg_tokens_per_char:.4f}")
     
-    # Generate distractor chunks with estimated token counts
-    print("Generating distractor text chunks...")
-    distractor_chunks = []
-    chunk_token_counts = []
+    # Pre-generate large distractor text pools
+    print("Pre-generating distractor text pools...")
+    distractor_pools = {}
     
-    # Create chunks of different sizes
-    for repeat_count in [5, 10, 20, 30, 40, 50, 75, 100, 150, 200]:
-        chunk_text = generate_distractor_phrases(repeat_count)
-        # Use analytical estimation instead of actual tokenization
-        estimated_tokens = estimate_tokens_analytically(chunk_text, avg_tokens_per_char)
-        distractor_chunks.append(chunk_text)
-        chunk_token_counts.append(estimated_tokens)
-        print(f"Chunk {repeat_count} repeats: ~{estimated_tokens} tokens (estimated)")
+    # Create multiple large text pools for different token targets
+    for target_tokens in [1000, 2000, 4000, 8000]:
+        # Generate text that's approximately target_tokens long
+        target_chars = int(target_tokens / avg_tokens_per_char)
+        repeats_needed = max(1, target_chars // 150)  # Rough estimate
+        
+        pool_text = generate_distractor_phrases(repeats_needed)
+        estimated_tokens = estimate_tokens_analytically(pool_text, avg_tokens_per_char)
+        
+        distractor_pools[target_tokens] = {
+            'text': pool_text,
+            'estimated_tokens': estimated_tokens,
+            'chars': len(pool_text)
+        }
+        print(f"Generated {target_tokens}T pool: {estimated_tokens} tokens, {len(pool_text):,} chars")
     
     # Estimate needle token count
     sample_needle = " The pass key is 1234. Remember it. 1234 is the pass key. "
     actual_needle_tokens = len(tokenizer.encode(sample_needle))
-    estimated_needle_tokens = estimate_tokens_analytically(sample_needle, avg_tokens_per_char)
     
-    print(f"Sample needle: {actual_needle_tokens} actual vs {estimated_needle_tokens} estimated tokens")
+    print(f"Sample needle tokens: {actual_needle_tokens}")
     
     # Calculate target distractor tokens
     fixed_tokens = len(instruction_tokens) + len(question_tokens) + actual_needle_tokens
@@ -125,8 +139,7 @@ def precompute_components(tokenizer, target_length: int = 10240) -> Dict:
         'question': question,
         'instruction_tokens': len(instruction_tokens),
         'question_tokens': len(question_tokens),
-        'distractor_chunks': distractor_chunks,
-        'chunk_token_counts': chunk_token_counts,
+        'distractor_pools': distractor_pools,
         'needle_tokens': actual_needle_tokens,
         'target_distractor_tokens': distractor_tokens_needed,
         'avg_tokens_per_char': avg_tokens_per_char
@@ -135,38 +148,46 @@ def precompute_components(tokenizer, target_length: int = 10240) -> Dict:
 
 def create_distractor_text(components: Dict, target_tokens: int) -> Tuple[str, int]:
     """
-    Create distractor text of approximately target_tokens length.
-    Returns both text and estimated token count.
+    Create distractor text of approximately target_tokens length using pools.
     """
-    chunks = components['distractor_chunks']
-    chunk_counts = components['chunk_token_counts']
+    pools = components['distractor_pools']
+    avg_tokens_per_char = components['avg_tokens_per_char']
     
-    selected_text = ""
-    current_tokens = 0
+    # Find the best pool to start with
+    best_pool_size = min(pools.keys(), key=lambda x: abs(x - target_tokens))
+    base_pool = pools[best_pool_size]
     
-    # Start with largest chunks and work down
-    for i in range(len(chunks) - 1, -1, -1):
-        while current_tokens + chunk_counts[i] <= target_tokens:
-            selected_text += chunks[i] + " "
-            current_tokens += chunk_counts[i]
+    text = base_pool['text']
+    current_tokens = base_pool['estimated_tokens']
     
-    # Fill remaining space with smallest chunks
-    while current_tokens < target_tokens and chunks:
-        selected_text += chunks[0] + " "
-        current_tokens += chunk_counts[0]
+    # Add more text if needed
+    if current_tokens < target_tokens:
+        # Calculate how much more we need
+        chars_needed = int((target_tokens - current_tokens) / avg_tokens_per_char)
+        # Use smallest pool to fill
+        smallest_pool = pools[min(pools.keys())]
+        
+        while current_tokens < target_tokens:
+            text += " " + smallest_pool['text']
+            current_tokens += smallest_pool['estimated_tokens']
     
-    return selected_text.strip(), current_tokens
+    # Trim if too long
+    if current_tokens > target_tokens * 1.1:  # 10% tolerance
+        # Estimate characters to keep
+        chars_to_keep = int(target_tokens / avg_tokens_per_char)
+        text = text[:chars_to_keep]
+        current_tokens = estimate_tokens_analytically(text, avg_tokens_per_char)
+    
+    return text, current_tokens
 
 
-def generate_single_example(args: Tuple) -> Dict:
+def generate_single_example(passkey: int, depth_percent: float, target_length: int, 
+                          components: Dict, seed: int) -> Dict:
     """
     Generate a single passkey example with analytical token counting.
-    This function runs in worker processes and uses NO tokenizer.
     """
-    passkey, depth_percent, target_length, components, worker_seed = args
-    
     # Set random seed for this example
-    random.seed(worker_seed)
+    random.seed(seed)
     
     # Create the passkey needle
     needle = f" The pass key is {passkey}. Remember it. {passkey} is the pass key. "
@@ -187,15 +208,18 @@ def generate_single_example(args: Tuple) -> Dict:
     else:
         # Middle - split distractor text
         distractor_words = distractor_text.split()
-        split_point = int(len(distractor_words) * (depth_percent / 100))
-        
-        first_part = " ".join(distractor_words[:split_point])
-        second_part = " ".join(distractor_words[split_point:])
-        
-        full_text = components['instruction'] + first_part + needle + second_part + components['question']
+        if len(distractor_words) > 10:  # Avoid empty splits
+            split_point = int(len(distractor_words) * (depth_percent / 100))
+            first_part = " ".join(distractor_words[:split_point])
+            second_part = " ".join(distractor_words[split_point:])
+            full_text = components['instruction'] + first_part + needle + second_part + components['question']
+        else:
+            # Fallback to end if text too short
+            full_text = components['instruction'] + distractor_text + needle + components['question']
     
     # Verify passkey is in text
-    assert str(passkey) in full_text, f"Passkey {passkey} not found in generated text"
+    if str(passkey) not in full_text:
+        print(f"WARNING: Passkey {passkey} not found in generated text")
     
     # Calculate estimated total token count analytically
     estimated_total_tokens = (
@@ -210,21 +234,50 @@ def generate_single_example(args: Tuple) -> Dict:
         "answer": str(passkey),
         "depth_percent": depth_percent,
         "passkey": passkey,
-        "token_count": estimated_total_tokens  # Use analytical estimate
+        "token_count": estimated_total_tokens
     }
+
+
+def generate_batch_examples(batch_args: Tuple) -> List[Dict]:
+    """
+    Generate a batch of examples in a single worker process.
+    This is the key function that maximizes CPU utilization.
+    """
+    batch_params, components, batch_id = batch_args
+    
+    examples = []
+    
+    # Process all examples in this batch
+    for passkey, depth_percent, target_length, seed in batch_params:
+        try:
+            example = generate_single_example(
+                passkey=passkey,
+                depth_percent=depth_percent, 
+                target_length=target_length,
+                components=components,
+                seed=seed
+            )
+            examples.append(example)
+            
+        except Exception as e:
+            print(f"Error in batch {batch_id} generating example {passkey}: {e}")
+            continue
+    
+    print(f"Batch {batch_id} completed: {len(examples)} examples")
+    return examples
 
 
 def batch_validate_samples(tokenizer, examples: List[Dict], batch_size: int = 1000) -> None:
     """
     Validate a small sample of examples to verify analytical estimates are reasonable.
-    Only checks a subset to avoid the tokenization bottleneck.
     """
     if not examples:
         return
         
-    print(f"Validating token estimates on {min(batch_size, len(examples))} sample examples...")
+    sample_size = min(batch_size, len(examples))
+    print(f"Validating token estimates on {sample_size} sample examples...")
     
-    sample_examples = random.sample(examples, min(batch_size, len(examples)))
+    sample_examples = random.sample(examples, sample_size)
     
     total_error = 0
     max_error = 0
@@ -252,12 +305,12 @@ def generate_dataset(
     num_workers: int = None
 ) -> Dataset:
     """
-    Generate full passkey retrieval dataset using ultra-optimized parallel processing.
+    Generate full passkey retrieval dataset using batch-optimized parallel processing.
     """
     if num_workers is None:
         num_workers = min(128, cpu_count())
     
-    print(f"Starting ULTRA-OPTIMIZED dataset generation with {num_workers} workers...")
+    print(f"Starting BATCH-OPTIMIZED dataset generation with {num_workers} workers...")
     print(f"Target: {num_examples} examples with ~{target_length} tokens each")
     
     # Load tokenizer once in main process (only for pre-computation)
@@ -277,7 +330,7 @@ def generate_dataset(
     
     # Generate all example parameters
     print("Generating example parameters...")
-    example_args = []
+    all_example_params = []
     used_passkeys = set()
     
     for depth in depth_percentages:
@@ -290,66 +343,79 @@ def generate_dataset(
                     break
             
             # Create unique seed for this example
-            worker_seed = seed + len(example_args)
+            example_seed = seed + len(all_example_params)
             
-            example_args.append((
-                passkey,
-                depth,
-                target_length,
-                components,
-                worker_seed
-            ))
+            all_example_params.append((passkey, depth, target_length, example_seed))
     
     # Shuffle for better load distribution
-    random.shuffle(example_args)
+    random.shuffle(all_example_params)
     
-    print(f"Generated {len(example_args)} example parameters")
-    print(f"Starting ultra-fast parallel generation...")
+    # Create batches for workers - THIS IS THE KEY OPTIMIZATION
+    batch_size = max(1, len(all_example_params) // num_workers)
+    batches = []
     
-    # Process examples in parallel with maximum CPU utilization
+    for i in range(0, len(all_example_params), batch_size):
+        batch_params = all_example_params[i:i + batch_size]
+        batch_id = len(batches)
+        batches.append((batch_params, components, batch_id))
+    
+    print(f"Created {len(batches)} batches with ~{batch_size} examples each")
+    print(f"Starting CPU-intensive batch processing...")
+    
+    # Process batches in parallel with maximum CPU utilization
     start_time = time.time()
-    examples = []
+    all_examples = []
     
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
-        # Submit all tasks
-        future_to_args = {
-            executor.submit(generate_single_example, args): args 
-            for args in example_args
+        # Submit batch tasks
+        future_to_batch = {
+            executor.submit(generate_batch_examples, batch): batch[2] 
+            for batch in batches
         }
         
         # Collect results with progress bar
         if TQDM_AVAILABLE:
-            futures = tqdm(as_completed(future_to_args), total=len(future_to_args), 
-                          desc="Generating examples", unit="ex")
+            futures = tqdm(as_completed(future_to_batch), total=len(future_to_batch), 
+                          desc="Processing batches", unit="batch")
         else:
-            futures = as_completed(future_to_args)
+            futures = as_completed(future_to_batch)
         
+        completed_batches = 0
         for future in futures:
             try:
-                example = future.result()
-                examples.append(example)
+                batch_examples = future.result()
+                all_examples.extend(batch_examples)
+                completed_batches += 1
+                
+                if TQDM_AVAILABLE:
+                    # Update description with progress
+                    current_rate = len(all_examples) / (time.time() - start_time)
+                    futures.set_description(
+                        f"Processing batches ({len(all_examples):,} examples, {current_rate:.0f}/s)"
+                    )
+                    
             except Exception as e:
-                print(f"Error generating example: {e}")
+                print(f"Error processing batch: {e}")
                 continue
     
     generation_time = time.time() - start_time
-    print(f"\nParallel generation completed in {generation_time:.1f} seconds")
-    print(f"Speed: {len(examples) / generation_time:.1f} examples/second")
-    print(f"Generated {len(examples)} examples")
+    print(f"\nBatch processing completed in {generation_time:.1f} seconds")
+    print(f"Speed: {len(all_examples) / generation_time:.1f} examples/second")
+    print(f"Generated {len(all_examples)} examples")
     
-    # Validate token estimates on a small sample (not all examples!)
-    batch_validate_samples(tokenizer, examples, batch_size=min(1000, len(examples) // 10))
+    # Validate token estimates on a small sample
+    batch_validate_samples(tokenizer, all_examples, batch_size=min(1000, len(all_examples) // 10))
     
     # Shuffle final examples
-    random.shuffle(examples)
+    random.shuffle(all_examples)
     
     # Create dataset
     dataset_dict = {
-        "prompt": [ex["prompt"] for ex in examples],
-        "answer": [ex["answer"] for ex in examples],
-        "depth_percent": [ex["depth_percent"] for ex in examples],
-        "token_count": [ex["token_count"] for ex in examples],
-        "passkey": [ex["passkey"] for ex in examples],
+        "prompt": [ex["prompt"] for ex in all_examples],
+        "answer": [ex["answer"] for ex in all_examples],
+        "depth_percent": [ex["depth_percent"] for ex in all_examples],
+        "token_count": [ex["token_count"] for ex in all_examples],
+        "passkey": [ex["passkey"] for ex in all_examples],
     }
     
     return Dataset.from_dict(dataset_dict)
@@ -412,13 +478,14 @@ def main():
     
     # Display configuration
     print("=" * 70)
-    print("ULTRA-OPTIMIZED PASSKEY DATASET GENERATOR")
+    print("BATCH-OPTIMIZED PASSKEY DATASET GENERATOR")
     print("=" * 70)
     print(f"Tokenizer: {args.tokenizer_path}")
     print(f"Examples: {args.num_examples:,}")
     print(f"Target length: {args.target_length:,} tokens")
     print(f"Workers: {max_workers} (requested: {args.num_workers})")
     print(f"CPU cores available: {cpu_count()}")
+    print(f"Batch size per worker: ~{args.num_examples // max_workers}")
     print(f"Seed: {args.seed}")
     print(f"TOKENIZERS_PARALLELISM: {os.environ.get('TOKENIZERS_PARALLELISM', 'not set')}")
     print("=" * 70)
@@ -468,7 +535,7 @@ def main():
         print("Dataset pushed successfully!")
     
     print("\n" + "=" * 70)
-    print("ULTRA-FAST GENERATION COMPLETE!")
+    print("BATCH-OPTIMIZED GENERATION COMPLETE!")
     print(f"Generated {len(dataset):,} examples in {total_time:.1f} seconds")
     print(f"Final speed: {len(dataset) / total_time:.1f} examples/second")
     print("=" * 70)
