@@ -56,14 +56,14 @@ optimizer:
   torch_adam_is_fused: false
   clip_grad: 1.0
   learning_rate_scheduler:
-    learning_rate: 0.00006
+    learning_rate: 0.00002
     lr_decay_starting_step: null
     lr_decay_steps: null
     lr_decay_style: cosine
     lr_warmup_steps: 50  
     lr_warmup_style: linear
-    min_decay_lr: 0.000003
-  weight_decay: 0.01
+    min_decay_lr: 0.000001
+  weight_decay: 0.02
   zero_stage: 0
 
 # Parallelism Configuration
@@ -89,8 +89,8 @@ tokens:
   limit_val_batches: 10
   micro_batch_size: 1
   sequence_length: 10240
-  train_steps: 30500
-  val_check_interval: 100
+  train_steps: 30200
+  val_check_interval: 50
 
 # Data Configuration - Use existing high-quality parquet files
 data_stages:
@@ -114,7 +114,7 @@ data_stages:
 
 # Checkpoints Configuration
 checkpoints:
-  checkpoint_interval: 100
+  checkpoint_interval: 50
   checkpoints_path: ./checkpoints/passkey_finetune_300m_simple
   checkpoints_path_is_shared_file_system: false
   resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
