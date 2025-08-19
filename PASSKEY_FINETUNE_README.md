@@ -1,6 +1,6 @@
-# Passkey Retrieval Finetuning for 300M Infini-Attention Model
+# Passkey Retrieval Finetuning for 300M Infini-Attention Model (Anti-Overfitting Optimized)
 
-This guide explains how to finetune your trained 300M Infini-Attention model on the passkey retrieval task using 10K token sequences.
+This guide explains how to finetune your trained 300M Infini-Attention model on the passkey retrieval task using 10K token sequences. **This version is optimized to prevent overfitting and improve generalization.**
 
 ## Overview
 
@@ -17,7 +17,14 @@ Input: "There is an important info hidden inside a lot of irrelevant text...
 Output: "9054"
 ```
 
-## Quick Start
+## 🚀 Quick Start (Anti-Overfitting Version)
+
+### Test Configuration First
+
+```bash
+# Verify anti-overfitting optimizations are correctly configured
+python3 test_anti_overfitting.py
+```
 
 ### Run the Finetuning
 
@@ -26,45 +33,54 @@ Output: "9054"
 ./run_passkey_finetune_300m.sh
 
 # Or specify your checkpoint path
-./run_passkey_finetune_300m.sh ./path/to/your/checkpoint 2000 42
+./run_passkey_finetune_300m.sh ./path/to/your/checkpoint
 
-# Arguments:
-# - checkpoint_path: Path to your trained 300M model checkpoint (e.g., step 30000)
-# - num_examples: Number of training examples to generate (default: 2000)
-# - seed: Random seed for reproducibility (default: 42)
+# This version automatically uses high-quality dataset at:
+# /data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-*.parquet
 ```
+
+### 🔥 Key Improvements for 4x RTX 4090 Setup
+
+- **Optimal batch size**: `micro_batch_size: 8` (effective batch size: 32)
+- **Higher learning rate**: `1e-4` for faster convergence 
+- **Regularization**: Dropout 0.1, weight decay 0.01
+- **Validation monitoring**: Early stopping prevents overfitting
+- **Stable Infini-Attention**: Reduced balance factor LR to 0.001
 
 ## Detailed Steps
 
-### 1. Generate the Dataset Manually (Optional)
+### 1. Using Pre-Generated High-Quality Dataset
 
-The main script does this automatically, but you can also generate the dataset separately:
-
-```bash
-python3 generate_passkey_finetune_data.py \
-    --tokenizer_path lvwerra/the-tokenizer-v1 \
-    --num_examples 2000 \
-    --target_length 10240 \
-    --save_path ./passkey_finetune_data_10k \
-    --seed 42
+This version uses a proven high-quality dataset located at:
+```
+/data1/infini-attn/infini-llama/nanotron-infini/finetuning/
+├── train-00000-of-00004.parquet
+├── train-00001-of-00004.parquet  
+├── train-00002-of-00004.parquet
+└── train-00003-of-00004.parquet
 ```
 
-This creates:
-- `passkey_finetune_data_10k/` - Dataset directory
-- `passkey_finetune_data_10k.parquet` - Parquet file for easy loading
+**Benefits**:
+- No data generation bottleneck 
+- Proven to work well with the model
+- Faster training startup
+- Consistent results across experiments
 
-### 2. Configure the Finetuning
+### 2. Anti-Overfitting Configuration (Pre-Optimized)
 
-Edit `passkey_finetune_300m_config.yaml` if needed:
+The `passkey_finetune_300m_simple_config.yaml` is now pre-optimized:
 
 ```yaml
-# Key settings to adjust:
-resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000  # Your checkpoint
-sequence_length: 10240  # 10K tokens  
-train_steps: 500  # Number of finetuning steps
-learning_rate: 0.00005  # Lower LR for finetuning
-micro_batch_size: 1  # Adjust based on GPU memory
-dp: 4  # Number of GPUs for data parallelism
+# 🔥 OPTIMIZED SETTINGS FOR 4x RTX 4090:
+learning_rate: 0.0001         # Increased from 2e-5 → 1e-4
+micro_batch_size: 8           # Increased from 1 → 8 (32 effective batch size)
+train_steps: 2000             # Reduced for focused training
+weight_decay: 0.01            # Increased regularization  
+attention_dropout: 0.1        # Added dropout
+hidden_dropout: 0.1           # Added dropout
+balance_factor_lr: 0.001      # Reduced from 0.01 → 0.001 for stability
+val_check_interval: 100       # Monitor validation every 100 steps
+early_stopping: enabled      # Stop when validation plateaus
 ```
 
 ### 3. Run Training

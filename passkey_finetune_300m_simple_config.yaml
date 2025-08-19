@@ -11,12 +11,12 @@ general:
 infini_attention:
   segment_length: 1024
   turn_on_memory: true
-  balance_factor_lr: 0.01
+  balance_factor_lr: 0.001
   balance_act_type: hard_sigmoid
   balance_init_type: zeros
   logging: true
-  logging_interval: 100
-  log_grad: false
+  logging_interval: 50 
+  log_grad: true
   log_segment_acts: false
   balance_factor_weight_decay: 0.0
 
@@ -46,6 +46,9 @@ model:
     tie_word_embeddings: false
     use_cache: true
     vocab_size: 49152
+    # Regularization for fine-tuning
+    attention_dropout: 0.1
+    hidden_dropout: 0.1
 
 # Optimizer Configuration
 optimizer:
@@ -56,14 +59,14 @@ optimizer:
   torch_adam_is_fused: false
   clip_grad: 1.0
   learning_rate_scheduler:
-    learning_rate: 0.00002
+    learning_rate: 0.0001 
     lr_decay_starting_step: null
     lr_decay_steps: null
-    lr_decay_style: cosine
-    lr_warmup_steps: 50
+    lr_decay_style: constant
+    lr_warmup_steps: 0
     lr_warmup_style: linear
-    min_decay_lr: 0.00002
-  weight_decay: 0.1
+    min_decay_lr: 0.0001
+  weight_decay: 0.01
   zero_stage: 0
 
 # Parallelism Configuration
@@ -82,17 +85,17 @@ tokenizer:
   tokenizer_name_or_path: lvwerra/the-tokenizer-v1
   tokenizer_revision: null
 
-# Training Tokens Configuration - For passkey finetuning
+# Training Tokens Configuration - Optimized for 4x RTX 4090
 tokens:
-  batch_accumulation_per_replica: 4
+  batch_accumulation_per_replica: 1
   limit_test_batches: 0
-  limit_val_batches: 0
-  micro_batch_size: 1
+  limit_val_batches: 10
+  micro_batch_size: 8
   sequence_length: 10240
-  train_steps: 30400  # Continue from 30000 to 30400
-  val_check_interval: -1
+  train_steps: 500
+  val_check_interval: 100
 
-# Data Configuration - Use data_stages with single stage
+# Data Configuration - Use existing high-quality parquet files
 data_stages:
   - name: "Passkey Finetune"
     start_training_step: 1
@@ -104,7 +107,11 @@ data_stages:
         text_column_name: "prompt"
         dataset_processing_num_proc_per_process: 48
         dataset_overwrite_cache: false
-        data_files: "./passkey_finetune_data_10k.parquet"
+        data_files: 
+          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00000-of-00004.parquet"
+          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00001-of-00004.parquet"
+          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00002-of-00004.parquet"
+          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00003-of-00004.parquet"
       num_loading_workers: 20
       seed: 42
 
@@ -116,11 +123,22 @@ checkpoints:
   resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
   save_initial_state: false
 
-# Logging Configuration
+# Logging Configuration - Enhanced for overfitting monitoring
 logging:
   iteration_step_info_interval: 10
   log_level: info
   log_level_replica: info
+  # Log training metrics more frequently to catch overfitting early
+  log_loss_every_n_steps: 10
+  log_grad_norm_every_n_steps: 25
 
 # Profiler (disabled)
 profiler: null
+
+# Early Stopping Configuration for Overfitting Prevention
+early_stopping:
+  enabled: true
+  patience: 3  # Stop if validation doesn't improve for 3 consecutive checks
+  min_delta: 0.001  # Minimum improvement threshold
+  monitor: "val_accuracy"  # Monitor validation accuracy
+  mode: "max"  # Stop when accuracy stops increasing

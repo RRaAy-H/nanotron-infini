@@ -1,57 +1,27 @@
 set -e  # Exit on error
 
 # Configuration
-CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/30000}" 
-NUM_EXAMPLES="${2:-3000}"  # Number of training examples to generate
-SEED="${3:-42}"
+CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/30000}"
 
 echo "=========================================================="
 echo "PASSKEY FINETUNING FOR 300M INFINI-ATTENTION MODEL"
 echo "=========================================================="
 echo "Base checkpoint: $CHECKPOINT_PATH"
-echo "Training examples: $NUM_EXAMPLES"
+echo "Using pre-generated dataset: /data1/infini-attn/infini-llama/nanotron-infini/finetuning/"
 echo "Sequence length: 10240 tokens (~10K)"
-echo "Seed: $SEED"
 echo "=========================================================="
 
 # Step 1: Check if checkpoint exists
 if [ ! -d "$CHECKPOINT_PATH" ]; then
     echo "ERROR: Checkpoint not found at $CHECKPOINT_PATH"
     echo "Please specify a valid checkpoint path as the first argument"
-    echo "Usage: ./run_passkey_finetune_300m.sh [checkpoint_path] [num_examples] [seed]"
+    echo "Usage: ./run_passkey_finetune_300m.sh [checkpoint_path]"
     exit 1
 fi
 
-# Step 2: Generate the passkey finetuning dataset
+# Step 2: Update config with checkpoint path
 echo ""
-echo "Step 1: Checking/Generating passkey finetuning dataset..."
-echo "=========================================================="
-
-# Check if dataset already exists
-if [ -f "./passkey_finetune_data_10k.parquet" ]; then
-    echo "Dataset already exists at ./passkey_finetune_data_10k.parquet"
-    echo "Skipping dataset generation. Delete the file if you want to regenerate."
-else
-    echo "Generating new passkey finetuning dataset..."
-    python generate_passkey_finetune_data.py \
-        --tokenizer_path lvwerra/the-tokenizer-v1 \
-        --num_examples $NUM_EXAMPLES \
-        --target_length 10240 \
-        --save_path ./passkey_finetune_data_10k \
-        --seed $SEED
-
-    if [ ! -f "./passkey_finetune_data_10k.parquet" ]; then
-        echo "ERROR: Dataset generation failed. Parquet file not found."
-        exit 1
-    fi
-fi
-
-echo ""
-echo "Dataset generated successfully!"
-echo ""
-
-# Step 3: Update config with checkpoint path
-echo "Step 2: Updating config with checkpoint path..."
+echo "Step 1: Updating config with checkpoint path..."
 echo "=========================================================="
 
 # Update the resume_checkpoint_path in the config
@@ -66,8 +36,8 @@ fi
 echo "Configuration updated with checkpoint: $CHECKPOINT_PATH"
 echo ""
 
-# Step 3: Run the finetuning
-echo "Step 3: Starting finetuning..."
+# Step 2: Run the finetuning
+echo "Step 2: Starting finetuning..."
 echo "=========================================================="
 
 # Set environment variables
@@ -102,14 +72,7 @@ if [ $? -eq 0 ]; then
     echo ""
     echo "Checkpoints saved to: ./checkpoints/passkey_finetune_300m_simple/"
     echo ""
-    echo "Final checkpoint should be at step 30500:"
     ls -la ./checkpoints/passkey_finetune_300m_simple/ 2>/dev/null || echo "Check the checkpoint directory"
-    
-    echo ""
-    echo "Next steps:"
-    echo "1. Evaluate the model using the passkey eval script:"
-    echo "   ./examples/infinite-context-length/scripts/run_passkey_eval_300m.sh ./checkpoints/passkey_finetune_300m_simple/30500 10240"
-    echo ""
 
 else
     echo ""
