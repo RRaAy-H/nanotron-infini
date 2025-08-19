@@ -89,7 +89,7 @@ tokens:
   limit_val_batches: 10
   micro_batch_size: 8
   sequence_length: 10240
-  train_steps: 500
+  train_steps: 30500
   val_check_interval: 100
 
 # Data Configuration - Use existing high-quality parquet files
