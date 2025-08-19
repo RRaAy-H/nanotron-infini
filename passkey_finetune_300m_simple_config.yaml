@@ -120,14 +120,11 @@ checkpoints:
   resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
   save_initial_state: false
 
-# Logging Configuration - Enhanced for overfitting monitoring
+# Logging Configuration
 logging:
   iteration_step_info_interval: 10
   log_level: info
   log_level_replica: info
-  # Log training metrics more frequently to catch overfitting early
-  log_loss_every_n_steps: 10
-  log_grad_norm_every_n_steps: 25
 
 # Profiler (disabled)
 profiler: null
