@@ -302,7 +302,8 @@ def generate_dataset(
     num_examples: int = 20000,
     target_length: int = 10240,
     seed: int = 42,
-    num_workers: int = None
+    num_workers: int = None,
+    skip_validation: bool = False
 ) -> Dataset:
     """
     Generate full passkey retrieval dataset using batch-optimized parallel processing.
@@ -416,8 +417,14 @@ def generate_dataset(
     print(f"Speed: {len(all_examples) / generation_time:.1f} examples/second")
     print(f"Generated {len(all_examples)} examples")
     
-    # Validate token estimates on a small sample
-    batch_validate_samples(tokenizer, all_examples, batch_size=min(1000, len(all_examples) // 10))
+    # Validate token estimates on a small sample (optional, can be skipped for speed)
+    if not skip_validation:
+        validation_samples = min(10, len(all_examples) // 1000)  # Tiny validation set - just 10 samples
+        validation_samples = max(10, validation_samples)  # Ensure at least 10 samples
+        print(f"Quick validation on {validation_samples} samples...")
+        batch_validate_samples(tokenizer, all_examples, batch_size=validation_samples)
+    else:
+        print("Skipping validation for maximum speed...")
     
     # Shuffle final examples
     random.shuffle(all_examples)
@@ -483,6 +490,11 @@ def main():
         default="your-username/passkey-finetune-10k",
         help="HuggingFace Hub repository name"
     )
+    parser.add_argument(
+        "--skip_validation",
+        action="store_true",
+        help="Skip token validation for maximum speed"
+    )
     
     args = parser.parse_args()
     
@@ -510,7 +522,8 @@ def main():
         num_examples=args.num_examples,
         target_length=args.target_length,
         seed=args.seed,
-        num_workers=max_workers
+        num_workers=max_workers,
+        skip_validation=args.skip_validation
     )
     total_time = time.time() - total_start
     
