@@ -328,24 +328,36 @@ def generate_dataset(
     depth_percentages = [0, 25, 50, 75, 100]
     examples_per_depth = num_examples // len(depth_percentages)
     
-    # Generate all example parameters
+    # Generate all example parameters efficiently
     print("Generating example parameters...")
     all_example_params = []
-    used_passkeys = set()
     
+    # Pre-generate all unique passkeys at once to avoid collision detection bottleneck
+    total_examples = sum(examples_per_depth for _ in depth_percentages)
+    print(f"Pre-generating {total_examples} unique passkeys...")
+    
+    # Generate more than needed and shuffle to avoid collision loops
+    passkey_pool = list(range(1000, 10000))  # All possible 4-digit numbers
+    random.shuffle(passkey_pool)
+    
+    if total_examples > len(passkey_pool):
+        # If we need more than 9000 examples, allow duplicates
+        print(f"Warning: Need {total_examples} examples but only {len(passkey_pool)} unique passkeys available")
+        print("Allowing duplicate passkeys...")
+        passkey_pool = passkey_pool * ((total_examples // len(passkey_pool)) + 1)
+    
+    selected_passkeys = passkey_pool[:total_examples]
+    
+    # Distribute passkeys across depths
+    passkey_idx = 0
     for depth in depth_percentages:
-        for i in range(examples_per_depth):
-            # Generate unique passkey
-            while True:
-                passkey = random.randint(1000, 9999)
-                if passkey not in used_passkeys:
-                    used_passkeys.add(passkey)
-                    break
-            
-            # Create unique seed for this example
+        print(f"Creating {examples_per_depth} examples for depth {depth}%...")
+        for i in tqdm(range(examples_per_depth), desc=f"Depth {depth}%", leave=False):
+            passkey = selected_passkeys[passkey_idx]
             example_seed = seed + len(all_example_params)
             
             all_example_params.append((passkey, depth, target_length, example_seed))
+            passkey_idx += 1
     
     # Shuffle for better load distribution
     random.shuffle(all_example_params)
@@ -354,7 +366,8 @@ def generate_dataset(
     batch_size = max(1, len(all_example_params) // num_workers)
     batches = []
     
-    for i in range(0, len(all_example_params), batch_size):
+    print("Creating worker batches...")
+    for i in tqdm(range(0, len(all_example_params), batch_size), desc="Creating batches"):
         batch_params = all_example_params[i:i + batch_size]
         batch_id = len(batches)
         batches.append((batch_params, components, batch_id))
