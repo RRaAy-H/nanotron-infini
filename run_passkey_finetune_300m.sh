@@ -44,6 +44,7 @@ echo "=========================================================="
 export CUDA_DEVICE_MAX_CONNECTIONS=1
 export OMP_NUM_THREADS=16
 export CUDA_VISIBLE_DEVICES=4,5,6,7
+export WANDB_DISABLED=true
 
 NUM_GPUS=4
 
