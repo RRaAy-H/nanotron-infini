@@ -27,8 +27,6 @@ model:
   init_method:
     std: 0.03125  # 1/sqrt(1024)
   make_vocab_size_divisible_by: 1
-  # Memory optimization settings
-  use_gradient_checkpointing: true  # Enable gradient checkpointing to save memory
   model_config:
     bos_token_id: 1
     eos_token_id: 2
