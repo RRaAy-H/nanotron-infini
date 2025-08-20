@@ -71,7 +71,21 @@ class ComprehensiveMemoryTester:
         print("=" * 70)
         print(f"Checkpoint: {self.checkpoint_path}")
         print(f"Output directory: {self.output_dir}")
-        print(f"Analysis mode: {'QUICK' if config.get('quick_test', False) else 'FULL'}")
+        
+        # Determine analysis mode
+        if config.get('quick_test', False):
+            mode = 'QUICK'
+        elif config.get('extreme_test', False):
+            mode = 'EXTREME (32K-128K contexts)'
+        else:
+            mode = 'STANDARD (8K-32K contexts)'
+        
+        print(f"Analysis mode: {mode}")
+        
+        # Show context lengths being tested
+        if config.get('comparison_context_lengths'):
+            print(f"Context lengths: {config.get('comparison_context_lengths')}")
+        
         print()
         
         start_time = time.time()
@@ -827,6 +841,8 @@ def main():
     # Test selection
     parser.add_argument("--quick-test", action="store_true",
                        help="Run quick test (balance factors + memory debug + comparison only)")
+    parser.add_argument("--extreme-test", action="store_true",
+                       help="Test with very long contexts (32K, 64K, 128K)")
     parser.add_argument("--skip-balance-factors", action="store_true",
                        help="Skip balance factor analysis")
     parser.add_argument("--skip-memory-debug", action="store_true",
@@ -839,14 +855,18 @@ def main():
                        help="Skip progressive context testing")
     
     # Test configuration
-    parser.add_argument("--debug-context-lengths", type=str, default="1024,2048,4096",
+    parser.add_argument("--debug-context-lengths", type=str, default="8192,16384,32768",
                        help="Context lengths for memory debugging")
-    parser.add_argument("--comparison-context-lengths", type=str, default="1024,2048,4096",
+    parser.add_argument("--comparison-context-lengths", type=str, default="8192,16384,32768",
                        help="Context lengths for memory comparison")
-    parser.add_argument("--content-context-lengths", type=str, default="4096",
+    parser.add_argument("--content-context-lengths", type=str, default="16384",
                        help="Context lengths for content analysis")
-    parser.add_argument("--progressive-max-context", type=int, default=8192,
+    parser.add_argument("--progressive-max-context", type=int, default=32768,
                        help="Maximum context length for progressive testing")
+    parser.add_argument("--progressive-min-context", type=int, default=8192,
+                       help="Minimum context length for progressive testing")
+    parser.add_argument("--progressive-step-size", type=int, default=8192,
+                       help="Step size for progressive testing")
     
     # Sample sizes
     parser.add_argument("--debug-samples", type=int, default=3,
@@ -868,21 +888,42 @@ def main():
         print(f"Error: Checkpoint path {checkpoint_path} does not exist")
         sys.exit(1)
     
+    # Handle extreme test mode
+    if args.extreme_test:
+        print("🚀 EXTREME TEST MODE: Testing with very long contexts (32K, 64K, 128K)")
+        print("⚠️  This may take 30-60 minutes and require significant GPU memory")
+        debug_context_lengths = "32768,65536,131072"
+        comparison_context_lengths = "32768,65536,131072"
+        content_context_lengths = "65536"
+        progressive_max_context = 131072
+        progressive_min_context = 32768
+        progressive_step_size = 32768
+    else:
+        debug_context_lengths = args.debug_context_lengths
+        comparison_context_lengths = args.comparison_context_lengths
+        content_context_lengths = args.content_context_lengths
+        progressive_max_context = args.progressive_max_context
+        progressive_min_context = args.progressive_min_context
+        progressive_step_size = args.progressive_step_size
+    
     # Build configuration
     config = {
         'quick_test': args.quick_test,
+        'extreme_test': args.extreme_test,
         'run_balance_factors': not args.skip_balance_factors,
         'run_memory_debug': not args.skip_memory_debug,
         'run_comparison': not args.skip_comparison,
         'run_content_analysis': not args.skip_content_analysis and not args.quick_test,
         'run_progressive_test': not args.skip_progressive_test and not args.quick_test,
-        'debug_context_lengths': args.debug_context_lengths,
-        'comparison_context_lengths': args.comparison_context_lengths,
-        'content_context_lengths': args.content_context_lengths,
-        'progressive_max_context': args.progressive_max_context,
+        'debug_context_lengths': debug_context_lengths,
+        'comparison_context_lengths': comparison_context_lengths,
+        'content_context_lengths': content_context_lengths,
+        'progressive_max_context': progressive_max_context,
+        'progressive_min_context': progressive_min_context,
+        'progressive_step_size': progressive_step_size,
         'debug_samples': args.debug_samples,
-        'comparison_samples': args.comparison_samples if not args.quick_test else 5,
-        'progressive_samples': args.progressive_samples,
+        'comparison_samples': args.comparison_samples if not args.quick_test else 3,  # Reduce samples for extreme test
+        'progressive_samples': args.progressive_samples if not args.extreme_test else 3,  # Reduce samples for extreme test
         'verbose': args.verbose
     }
     

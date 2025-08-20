@@ -14,9 +14,15 @@ echo "================================================================="
 if [ $# -eq 0 ]; then
     echo "Error: No checkpoint path provided"
     echo "Usage: $0 <checkpoint_path> [additional_args...]"
-    echo "       $0 <checkpoint_path> --summary    # Quick summary test"
-    echo "Example: $0 /data1/infini-attn/infini-llama/nanotron-infini/checkpoints/fineweb_4gpu_300m_infini/30000"
-    echo "         $0 /path/to/checkpoint --summary"
+    echo "       $0 <checkpoint_path> --summary          # Quick summary test"
+    echo "       $0 <checkpoint_path> --extreme-test     # Very long contexts (32K, 64K, 128K)"
+    echo "       $0 <checkpoint_path> --summary --extreme # Summary with long contexts"
+    echo ""
+    echo "Examples:"
+    echo "  $0 /data1/infini-attn/infini-llama/nanotron-infini/checkpoints/fineweb_4gpu_300m_infini/30000"
+    echo "  $0 /path/to/checkpoint --summary"
+    echo "  $0 /path/to/checkpoint --extreme-test"
+    echo "  $0 /path/to/checkpoint --summary --extreme"
     exit 1
 fi
 
