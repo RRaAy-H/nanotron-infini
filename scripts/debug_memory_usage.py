@@ -358,7 +358,7 @@ def test_memory_usage(
         
         context_results = {
             'context_length': context_length,
-            'expected_segments': max(1, context_length // config.model.model_config.max_position_embeddings),  # Simplified
+            'expected_segments': max(1, context_length // config.infini_attention.segment_length),  # Fixed: use segment_length not max_position_embeddings
             'samples': []
         }
         
