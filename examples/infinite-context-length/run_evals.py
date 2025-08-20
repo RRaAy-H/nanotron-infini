@@ -10,6 +10,7 @@ torchrun --nproc_per_node=4 run_generate.py ---ckpt-path checkpoints/test/4
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
 import torch

@@ -351,7 +351,9 @@ class MemoryComparison:
                 return 0.0
                 
         except Exception as e:
-            print(f"    Error evaluating sample: {e}")
+            import traceback
+            print(f"    Error evaluating sample: {type(e).__name__}: {str(e)}")
+            print(f"    Traceback: {traceback.format_exc()}")
             return 0.0
     
     def perform_statistical_analysis(self, with_memory: Dict[int, List[float]], 

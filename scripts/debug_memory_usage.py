@@ -322,7 +322,7 @@ def load_model_and_tokenizer(checkpoint_path: str):
     from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
     
     # Apply the fix
-    fix_success = apply_balance_factor_fix_standalone(model, args.checkpoint, verbose=False)
+    fix_success = apply_balance_factor_fix_standalone(model, checkpoint_path, verbose=False)
     
     if fix_success:
         layer0 = model.model.decoder[0]
