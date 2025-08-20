@@ -358,6 +358,21 @@ def load_weights(
         else:
             raise NotImplementedError(f"Parameters {param} should be a NanotronParameter")
 
+    # Apply balance factor fix for Infini-Attention models
+    try:
+        from nanotron.models.balance_factor_fix import apply_balance_factor_fix_if_needed
+        apply_balance_factor_fix_if_needed(model, root_folder, verbose=False)
+    except ImportError:
+        # Gracefully handle if balance factor fix is not available
+        pass
+    except Exception as e:
+        log_rank(
+            f"Warning: Balance factor loading failed: {e}",
+            logger=logger,
+            level=logging.WARNING,
+            rank=0,
+        )
+
     return param_shard_metadata
 
 

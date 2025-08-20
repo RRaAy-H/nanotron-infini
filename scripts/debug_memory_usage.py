@@ -316,9 +316,19 @@ def load_model_and_tokenizer(checkpoint_path: str):
     # Mark tied parameters
     mark_tied_parameters(model=model, parallel_context=parallel_context, parallel_config=parallel_config)
     
-    # Load weights
+    # Load weights (balance factors now load automatically with permanent fix)
     load_weights(model=model, parallel_context=parallel_context, root_folder=checkpoint_path)
     model.eval()
+    
+    # Verify balance factors loaded correctly
+    layer0 = model.model.decoder[0]
+    if hasattr(layer0, 'pp_block') and hasattr(layer0.pp_block, 'attn') and hasattr(layer0.pp_block.attn, 'balance_factors'):
+        bf = layer0.pp_block.attn.balance_factors.data
+        if bf.std().item() > 0.1:
+            activated = layer0.pp_block.attn.balance_act_func(bf)
+            print(f"✅ Balance factors loaded automatically: Layer 0 using {activated.mean().item()*100:.1f}% memory")
+        else:
+            print("⚠️  Balance factors may not be loaded properly")
     
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
