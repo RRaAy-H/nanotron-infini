@@ -53,16 +53,23 @@ def debug_balance_factors():
     print("\n=== BEFORE WEIGHT LOADING ===")
     for layer_idx in range(min(3, len(model.model.decoder))):  # Check first 3 layers
         layer = model.model.decoder[layer_idx]
-        if hasattr(layer, 'attn') and hasattr(layer.attn, 'balance_factors'):
-            bf = layer.attn.balance_factors.data
-            print(f"Layer {layer_idx}: balance_factors shape={bf.shape}, mean={bf.mean().item():.6f}, std={bf.std().item():.6f}")
-            print(f"  First few values: {bf.flatten()[:5].tolist()}")
+        print(f"Layer {layer_idx} structure:")
+        print(f"  has attn: {hasattr(layer, 'attn')}")
+        if hasattr(layer, 'attn'):
+            print(f"  attn attributes: {[attr for attr in dir(layer.attn) if not attr.startswith('_')]}")
+            if hasattr(layer.attn, 'balance_factors'):
+                bf = layer.attn.balance_factors.data
+                print(f"  balance_factors shape={bf.shape}, mean={bf.mean().item():.6f}, std={bf.std().item():.6f}")
+                print(f"  First few values: {bf.flatten()[:5].tolist()}")
+            else:
+                print(f"  No balance_factors attribute found")
         else:
-            print(f"Layer {layer_idx}: No balance_factors found")
+            print(f"  No attn attribute found")
     
     # Load weights
     print("\n=== LOADING WEIGHTS ===")
-    load_weights(model=model, parallel_context=parallel_context, root_folder='/data1/infini-attn/infini-llama/nanotron-infini/checkpoints/fineweb_4gpu_300m_infini/30000')
+    from pathlib import Path
+    load_weights(model=model, parallel_context=parallel_context, root_folder=Path('/data1/infini-attn/infini-llama/nanotron-infini/checkpoints/fineweb_4gpu_300m_infini/30000'))
     model.eval()
     
     print("\n=== AFTER WEIGHT LOADING ===")
@@ -73,13 +80,13 @@ def debug_balance_factors():
             print(f"Layer {layer_idx}: balance_factors shape={bf.shape}, mean={bf.mean().item():.6f}, std={bf.std().item():.6f}")
             print(f"  First few values: {bf.flatten()[:5].tolist()}")
             
-            # Check if these match your known good values
+            # Check if these match your known good values (0.067-0.929 range)
             if bf.std().item() > 0.1:  # Should have variation if loaded correctly
                 print(f"  ✅ GOOD: Balance factors loaded with variation")
             else:
                 print(f"  ❌ BAD: Balance factors appear not loaded (low variation)")
         else:
-            print(f"Layer {layer_idx}: No balance_factors found")
+            print(f"Layer {layer_idx}: balance_factors not found after loading")
     
     # Test the balance activation function
     print("\n=== TESTING BALANCE ACTIVATION ===")

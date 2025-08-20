@@ -487,11 +487,12 @@ class CausalSelfAttention(nn.Module, AttachableStore):
 
         from nanotron.parallel.sharded_parameters import SplitConfig, create_sharded_parameter_from_config
 
+        # Initialize balance factors - these will be overwritten if loading from checkpoint
         if constants.CONFIG.infini_attention.balance_init_type == "zeros":
-            log_rank("Zero initialized balance factors", logger=logger, level=logging.WARNING, rank=0)
+            log_rank("Initializing balance factors with zeros (will be overwritten if loading from checkpoint)", logger=logger, level=logging.WARNING, rank=0)
             balance_factors = nn.Parameter(torch.zeros(self.n_local_q_heads, device=device, dtype=torch.float32))
         elif constants.CONFIG.infini_attention.balance_init_type == "randn":
-            log_rank("randn initialized balance factors", logger=logger, level=logging.WARNING, rank=0)
+            log_rank("Initializing balance factors with randn (will be overwritten if loading from checkpoint)", logger=logger, level=logging.WARNING, rank=0)
             balance_factors = nn.Parameter(torch.randn(self.n_local_q_heads, device=device, dtype=torch.float32))
         else:
             raise ValueError(f"balance_init_type {constants.CONFIG.infini_attention.balance_init_type} not supported")
