@@ -27,6 +27,20 @@ import safetensors
 from safetensors import safe_open
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle numpy types."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        return super().default(obj)
+
+
 class BalanceFactorAnalyzer:
     """Analyze balance factors from Infini-Attention checkpoints."""
     
@@ -601,7 +615,7 @@ def main():
         # Save report
         report_path = Path(args.output_dir) / "balance_factor_report.json"
         with open(report_path, 'w') as f:
-            json.dump(report, f, indent=2)
+            json.dump(report, f, indent=2, cls=NumpyEncoder)
         
         # Save raw data if requested
         if args.save_raw:

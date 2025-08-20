@@ -42,6 +42,20 @@ from nanotron.serialize import load_weights
 from nanotron.trainer import CONFIG_TO_MODEL_CLASS, mark_tied_parameters
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle numpy types."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        return super().default(obj)
+
+
 @dataclass
 class ComparisonResult:
     """Results from memory vs no-memory comparison."""
@@ -307,8 +321,9 @@ class MemoryComparison:
             )
             
             # Extract generated text
-            if outputs and len(outputs) > 0:
-                generated_text = outputs[0]
+            output_list = list(outputs)  # Convert generator to list
+            if output_list and len(output_list) > 0:
+                generated_text = output_list[0]
                 # Extract the answer from the generated text
                 # Look for the passkey number in the response
                 import re
@@ -827,7 +842,7 @@ def main():
     # Save report
     report_path = Path(args.output_dir) / "comparison_report.json"
     with open(report_path, 'w') as f:
-        json.dump(report, f, indent=2)
+        json.dump(report, f, indent=2, cls=NumpyEncoder)
     
     # Print summary
     print("\n" + "=" * 50)

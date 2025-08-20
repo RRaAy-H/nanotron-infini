@@ -41,6 +41,20 @@ from nanotron.serialize import load_weights
 from nanotron.trainer import CONFIG_TO_MODEL_CLASS, mark_tied_parameters
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle numpy types."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        return super().default(obj)
+
+
 class ProgressiveContextTester:
     """Test memory mechanism across progressively increasing context lengths."""
     
@@ -453,8 +467,9 @@ class ProgressiveContextTester:
             response_time = time.time() - start_time
             
             # Analyze response
-            if outputs and len(outputs) > 0:
-                generated_text = outputs[0].strip()
+            output_list = list(outputs)  # Convert generator to list
+            if output_list and len(output_list) > 0:
+                generated_text = output_list[0].strip()
                 
                 # Check accuracy
                 accuracy = self._check_accuracy(
@@ -1203,7 +1218,7 @@ def main():
     # Save report
     report_path = Path(args.output_dir) / "progressive_context_report.json"
     with open(report_path, 'w') as f:
-        json.dump(report, f, indent=2)
+        json.dump(report, f, indent=2, cls=NumpyEncoder)
     
     # Print summary
     print("\n" + "=" * 60)

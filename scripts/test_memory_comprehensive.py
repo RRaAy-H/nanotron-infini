@@ -26,6 +26,20 @@ from plotly.subplots import make_subplots
 from jinja2 import Template
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle numpy types."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        return super().default(obj)
+
+
 class ComprehensiveMemoryTester:
     """Master orchestrator for comprehensive memory testing."""
     
@@ -598,7 +612,7 @@ class ComprehensiveMemoryTester:
         # Save JSON report
         json_path = self.output_dir / "comprehensive_memory_analysis_report.json"
         with open(json_path, 'w') as f:
-            json.dump(consolidated, f, indent=2)
+            json.dump(consolidated, f, indent=2, cls=NumpyEncoder)
         
         print(f"Unified report generated:")
         print(f"  HTML: {html_path}")

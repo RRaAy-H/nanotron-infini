@@ -44,6 +44,20 @@ from nanotron.serialize import load_weights
 from nanotron.trainer import CONFIG_TO_MODEL_CLASS, mark_tied_parameters
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle numpy types."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        return super().default(obj)
+
+
 class MemoryStateCapture:
     """Capture and analyze memory states during inference."""
     
@@ -380,8 +394,9 @@ class MemoryContentAnalyzer:
                 )
                 
                 # Analyze answer
-                if outputs and len(outputs) > 0:
-                    generated_answer = outputs[0].strip()
+                output_list = list(outputs)  # Convert generator to list
+                if output_list and len(output_list) > 0:
+                    generated_answer = output_list[0].strip()
                     
                     # Check if answer is correct
                     is_correct = self._check_answer_correctness(
@@ -1055,7 +1070,7 @@ def main():
         # Save individual report
         report_path = Path(args.output_dir) / f"memory_content_report_{context_length}.json"
         with open(report_path, 'w') as f:
-            json.dump(report, f, indent=2)
+            json.dump(report, f, indent=2, cls=NumpyEncoder)
         
         print(f"Report saved to: {report_path}")
     
@@ -1073,7 +1088,7 @@ def main():
     # Save overall summary
     summary_path = Path(args.output_dir) / "memory_content_overall_summary.json"
     with open(summary_path, 'w') as f:
-        json.dump(overall_summary, f, indent=2)
+        json.dump(overall_summary, f, indent=2, cls=NumpyEncoder)
     
     # Print summary
     print("\n" + "=" * 50)

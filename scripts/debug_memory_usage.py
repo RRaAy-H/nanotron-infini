@@ -38,6 +38,20 @@ from nanotron.serialize import load_weights
 from nanotron.trainer import CONFIG_TO_MODEL_CLASS, mark_tied_parameters
 
 
+class NumpyEncoder(json.JSONEncoder):
+    """Custom JSON encoder to handle numpy types."""
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, (np.bool_, bool)):
+            return bool(obj)
+        return super().default(obj)
+
+
 class MemoryUsageMonitor:
     """Monitor infini-attention memory usage during inference."""
     
@@ -229,7 +243,7 @@ class MemoryUsageMonitor:
         # Save JSON report
         json_path = self.output_dir / f"{prefix}_report.json"
         with open(json_path, 'w') as f:
-            json.dump(report, f, indent=2)
+            json.dump(report, f, indent=2, cls=NumpyEncoder)
         
         # Save detailed logs
         logs_path = self.output_dir / f"{prefix}_detailed_logs.json"
@@ -239,7 +253,7 @@ class MemoryUsageMonitor:
             'segment_stats': self.segment_stats
         }
         with open(logs_path, 'w') as f:
-            json.dump(detailed_logs, f, indent=2)
+            json.dump(detailed_logs, f, indent=2, cls=NumpyEncoder)
         
         print(f"Results saved to: {self.output_dir}")
         return json_path, logs_path
