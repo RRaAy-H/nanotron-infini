@@ -91,6 +91,7 @@ class MemoryUsageMonitor:
                 # Store original functions
                 original_retrieve = attn_layer._retrieve_from_memory
                 original_update = attn_layer._update_memory
+                original_forward = attn_layer.forward
                 
                 # Create monitoring wrapper that actually works
                 def create_monitored_retrieve(layer_idx, original_func):
@@ -141,9 +142,23 @@ class MemoryUsageMonitor:
                         return new_memory, new_normalization
                     return monitored_update
                 
+                # Create sequence length monitor for first layer only
+                def create_monitored_forward(layer_idx, original_func):
+                    def monitored_forward(hidden_states, sequence_mask):
+                        if layer_idx == 0:  # Only monitor first layer to avoid spam
+                            seq_len = hidden_states.shape[1]
+                            expected_segments = max(1, seq_len // 1024)
+                            print(f"🔍 Layer {layer_idx}: Processing seq_len={seq_len}, expected_segments={expected_segments}")
+                            if seq_len <= 1024:
+                                print(f"    ⚠️  seq_len ≤ 1024 → Only 1 segment → Memory created but not retrieved!")
+                        return original_func(hidden_states, sequence_mask)
+                    return monitored_forward
+                
                 # Replace functions with monitored versions
                 attn_layer._retrieve_from_memory = create_monitored_retrieve(layer_idx, original_retrieve)
                 attn_layer._update_memory = create_monitored_update(layer_idx, original_update)
+                if layer_idx == 0:  # Only hook forward for first layer
+                    attn_layer.forward = create_monitored_forward(layer_idx, original_forward)
             else:
                 print(f"     ❌ No attention layer found")
         
