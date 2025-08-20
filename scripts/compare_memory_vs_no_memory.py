@@ -337,7 +337,20 @@ class MemoryComparison:
             # Extract generated text
             output_list = list(outputs)  # Convert generator to list
             if output_list and len(output_list) > 0:
-                generated_text = output_list[0]
+                generation_output = output_list[0]
+                
+                # Extract actual text from GenerationOutput object
+                if hasattr(generation_output, 'generation_ids'):
+                    # Decode the generated token IDs to text
+                    generated_tokens = generation_output.generation_ids
+                    input_tokens = generation_output.input_ids
+                    # Get only the newly generated tokens (excluding input)
+                    new_tokens = generated_tokens[len(input_tokens):]
+                    generated_text = self.tokenizer.decode(new_tokens, skip_special_tokens=True)
+                else:
+                    # Fallback: assume it's already a string
+                    generated_text = str(generation_output)
+                
                 # Extract the answer from the generated text
                 # Look for the passkey number in the response
                 import re
@@ -351,9 +364,7 @@ class MemoryComparison:
                 return 0.0
                 
         except Exception as e:
-            import traceback
-            print(f"    Error evaluating sample: {type(e).__name__}: {str(e)}")
-            print(f"    Traceback: {traceback.format_exc()}")
+            print(f"    Error evaluating sample: {e}")
             return 0.0
     
     def perform_statistical_analysis(self, with_memory: Dict[int, List[float]], 
