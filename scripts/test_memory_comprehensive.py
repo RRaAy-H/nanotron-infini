@@ -166,6 +166,16 @@ class ComprehensiveMemoryTester:
         context_lengths = config.get('debug_context_lengths', '1024,2048,4096')
         
         try:
+            # Set up environment variables for distributed PyTorch
+            env = os.environ.copy()
+            env.update({
+                'MASTER_ADDR': 'localhost',
+                'MASTER_PORT': '29500',
+                'WORLD_SIZE': '1',
+                'RANK': '0',
+                'LOCAL_RANK': '0'
+            })
+            
             cmd = [
                 sys.executable, str(self.scripts['memory_debug']),
                 '--checkpoint', str(self.checkpoint_path),
@@ -178,7 +188,7 @@ class ComprehensiveMemoryTester:
                 cmd.append('--verbose')
             
             print(f"  Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800, env=env)
             
             if result.returncode == 0:
                 # Load results
@@ -204,6 +214,16 @@ class ComprehensiveMemoryTester:
         context_lengths = config.get('comparison_context_lengths', '1024,2048,4096')
         
         try:
+            # Set up environment variables for distributed PyTorch
+            env = os.environ.copy()
+            env.update({
+                'MASTER_ADDR': 'localhost',
+                'MASTER_PORT': '29500',
+                'WORLD_SIZE': '1',
+                'RANK': '0',
+                'LOCAL_RANK': '0'
+            })
+            
             cmd = [
                 sys.executable, str(self.scripts['memory_comparison']),
                 '--checkpoint', str(self.checkpoint_path),
@@ -213,7 +233,7 @@ class ComprehensiveMemoryTester:
             ]
             
             print(f"  Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env=env)
             
             if result.returncode == 0:
                 # Load results
@@ -239,6 +259,22 @@ class ComprehensiveMemoryTester:
         context_lengths = config.get('content_context_lengths', '4096')
         
         try:
+            # Set up environment variables for distributed PyTorch
+            env = os.environ.copy()
+            env.update({
+                'MASTER_ADDR': 'localhost',
+                'MASTER_PORT': '29500',
+                'WORLD_SIZE': '1',
+                'RANK': '0',
+                'LOCAL_RANK': '0'
+            })
+            
+            # Check if scikit-learn is available
+            try:
+                import sklearn
+            except ImportError:
+                return {'status': 'failed', 'error': 'scikit-learn not available. Please install with: pip install scikit-learn'}
+            
             cmd = [
                 sys.executable, str(self.scripts['content_analysis']),
                 '--checkpoint', str(self.checkpoint_path),
@@ -247,7 +283,7 @@ class ComprehensiveMemoryTester:
             ]
             
             print(f"  Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=3600, env=env)
             
             if result.returncode == 0:
                 # Load results
@@ -272,6 +308,16 @@ class ComprehensiveMemoryTester:
         progressive_output_dir = self.output_dir / "progressive_testing"
         
         try:
+            # Set up environment variables for distributed PyTorch
+            env = os.environ.copy()
+            env.update({
+                'MASTER_ADDR': 'localhost',
+                'MASTER_PORT': '29500',
+                'WORLD_SIZE': '1',
+                'RANK': '0',
+                'LOCAL_RANK': '0'
+            })
+            
             cmd = [
                 sys.executable, str(self.scripts['progressive_test']),
                 '--checkpoint', str(self.checkpoint_path),
@@ -283,7 +329,7 @@ class ComprehensiveMemoryTester:
             ]
             
             print(f"  Running: {' '.join(cmd)}")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=7200, env=env)
             
             if result.returncode == 0:
                 # Load results
