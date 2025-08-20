@@ -68,7 +68,7 @@ class MemoryUsageMonitor:
         """Hook into memory retrieval and update functions with working monitoring."""
         
         # Hook all decoder layers (but only log first layer for brevity)
-        for layer_idx, layer in enumerate(model.model.decoder):
+        for layer_idx, layer in enumerate(model.decoder):
             # Access attention through pp_block wrapper
             if hasattr(layer, 'pp_block') and hasattr(layer.pp_block, 'attn'):
                 attn_layer = layer.pp_block.attn
@@ -320,7 +320,7 @@ def load_model_and_tokenizer(checkpoint_path: str):
     fix_success = apply_balance_factor_fix_standalone(model, checkpoint_path, verbose=False)
     
     if fix_success:
-        layer0 = model.model.decoder[0]
+        layer0 = model.model.decoder[0]  # Note: This is still model.model because we haven't loaded model.model separately
         if hasattr(layer0, 'pp_block') and hasattr(layer0.pp_block, 'attn') and hasattr(layer0.pp_block.attn, 'balance_factors'):
             bf = layer0.pp_block.attn.balance_factors.data
             activated = layer0.pp_block.attn.balance_act_func(bf)
@@ -445,9 +445,9 @@ def main():
     # Initialize monitor
     monitor = MemoryUsageMonitor(args.output_dir)
     
-    # Hook memory functions
+    # Hook memory functions on the correct model instance
     print("Setting up memory monitoring hooks...")
-    monitor.hook_memory_functions(model)
+    monitor.hook_memory_functions(model.model)  # Hook model.model since that's what decode_text uses
     
     # Test memory usage
     print("\nTesting memory usage...")
