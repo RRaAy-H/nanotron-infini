@@ -609,27 +609,27 @@ class ComprehensiveMemoryTester:
         {% set pass_fail = analysis.pass_fail_determination %}
         
         <div class="status-box 
-        {%- if pass_fail.final_determination == 'PASS' %} status-pass
-        {%- elif pass_fail.final_determination == 'FAIL' %} status-fail
+        {%- if analysis.pass_fail_determination.final_determination == 'PASS' %} status-pass
+        {%- elif analysis.pass_fail_determination.final_determination == 'FAIL' %} status-fail
         {%- else %} status-conditional
         {%- endif %}">
-            <h3>Final Determination: {{ pass_fail.final_determination }}</h3>
-            <p><strong>Confidence:</strong> {{ pass_fail.confidence }}</p>
-            <p><strong>Numeric Score:</strong> {{ "%.2f"|format(pass_fail.numeric_score) }}/1.0</p>
-            <p><strong>Tests Passed:</strong> {{ pass_fail.tests_passed }}</p>
+            <h3>Final Determination: {{ analysis.pass_fail_determination.final_determination }}</h3>
+            <p><strong>Confidence:</strong> {{ analysis.pass_fail_determination.confidence }}</p>
+            <p><strong>Numeric Score:</strong> {{ "%.2f"|format(analysis.pass_fail_determination.numeric_score) }}/1.0</p>
+            <p><strong>Tests Passed:</strong> {{ analysis.pass_fail_determination.tests_passed }}</p>
         </div>
         
         <div style="margin: 20px 0;">
-            <strong>Overall Status:</strong> {{ overall.status }}<br>
+            <strong>Overall Status:</strong> {{ analysis.overall_assessment.status }}<br>
             <div class="progress-bar" style="margin-top: 10px;">
-                <div class="progress-fill" style="width: {{ (overall.average_score * 100)|int }}%;"></div>
+                <div class="progress-fill" style="width: {{ (analysis.overall_assessment.average_score * 100)|int if analysis.overall_assessment.average_score is defined else 0 }}%;"></div>
             </div>
-            <small>{{ "%.1f"|format(overall.average_score * 100) }}% Average Score</small>
+            <small>{{ "%.1f"|format(analysis.overall_assessment.average_score * 100) if analysis.overall_assessment.average_score is defined else "0.0" }}% Average Score</small>
         </div>
         
         <h3>Reasoning:</h3>
         <ul>
-        {% for reason in pass_fail.reasoning %}
+        {% for reason in analysis.pass_fail_determination.reasoning %}
             <li>{{ reason }}</li>
         {% endfor %}
         </ul>
