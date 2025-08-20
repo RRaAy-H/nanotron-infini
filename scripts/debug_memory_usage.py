@@ -119,10 +119,12 @@ class MemoryUsageMonitor:
         
         # Hook all decoder layers
         for layer_idx, layer in enumerate(model.model.decoder):
-            if hasattr(layer, 'attn'):
+            # Access attention through pp_block wrapper
+            if hasattr(layer, 'pp_block') and hasattr(layer.pp_block, 'attn'):
+                attn_layer = layer.pp_block.attn
                 # Store original functions
-                original_retrieve = layer.attn._retrieve_from_memory
-                original_update = layer.attn._update_memory
+                original_retrieve = attn_layer._retrieve_from_memory
+                original_update = attn_layer._update_memory
                 
                 # Create monitoring wrapper
                 def monitored_retrieve(query_states, prev_memory, prev_normalization, layer_idx=layer_idx):
@@ -138,8 +140,8 @@ class MemoryUsageMonitor:
                     return original_update(prev_memory, prev_normalization, key_states, value_states)
                 
                 # Replace functions with monitored versions
-                layer.attn._retrieve_from_memory = monitored_retrieve
-                layer.attn._update_memory = monitored_update
+                attn_layer._retrieve_from_memory = monitored_retrieve
+                attn_layer._update_memory = monitored_update
     
     def analyze_segment_patterns(self, segment_length: int = 1024):
         """Analyze memory usage patterns by segment."""
