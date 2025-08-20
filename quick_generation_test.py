@@ -13,6 +13,7 @@ from nanotron.config import get_config_from_file, GenerationArgs, ParallelismArg
 from nanotron.generation.decode import GenerationInput, TokenizerConfig, decode_text
 from nanotron.models import build_model
 from nanotron.parallel import ParallelContext
+from nanotron.parallel.parameters import sanity_check
 from nanotron.parallel.pipeline_parallel.engine import OneForwardOneBackwardPipelineEngine
 from nanotron.parallel.tensor_parallel.enum import TensorParallelLinearMode
 from nanotron.random import RandomStates, get_current_random_state, get_synced_random_state, set_random_seed
@@ -62,20 +63,36 @@ def test_basic_generation(checkpoint_path: str):
     
     # Build model
     print("Building model...")
+    
+    # Get model class name (same pattern as run_generate.py)
+    model_config_cls = model_config.__class__.__name__
+    if model_config_cls not in CONFIG_TO_MODEL_CLASS:
+        raise ValueError(f"Unsupported model config {model_config_cls}. Only {CONFIG_TO_MODEL_CLASS.keys()} are supported")
+    
+    # Get synchronized random states (same pattern as run_generate.py)
+    if parallel_config.tp_mode is TensorParallelLinearMode.ALL_REDUCE:
+        random_states = RandomStates(
+            {"tp_synced": get_synced_random_state(random_state=get_current_random_state(), pg=parallel_context.tp_pg)}
+        )
+    else:
+        random_states = RandomStates({})
+    
     model = build_model(
-        model_builder=lambda: CONFIG_TO_MODEL_CLASS[config.model_config](
+        model_builder=lambda: CONFIG_TO_MODEL_CLASS[model_config_cls](
             config=model_config,
             parallel_context=parallel_context,
             parallel_config=parallel_config,
-            random_states=RandomStates(),
+            random_states=random_states,
         ),
-        parallel_context=parallel_context,
         dtype=torch.bfloat16,
-        device=torch.device("cuda"),
+        parallel_context=parallel_context,
     )
     
     # Mark tied parameters
     mark_tied_parameters(model=model, parallel_context=parallel_context, parallel_config=parallel_config)
+    
+    # Sanity check model
+    sanity_check(root_module=model)
     
     # Load weights
     print("Loading weights...")
