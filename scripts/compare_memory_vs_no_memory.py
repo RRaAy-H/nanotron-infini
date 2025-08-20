@@ -314,10 +314,10 @@ class MemoryComparison:
                 tokenizer=self.tokenizer,
                 model=self.model.model,
                 parallel_context=self.parallel_context,
-                max_new_tokens=10,  # Only need a few tokens for the number
+                max_new_tokens=20,  # Increased slightly for better passkey generation
                 max_micro_batch_size=1,
                 generation_config=GenerationArgs(sampler="greedy", use_cache=False),
-                tokenizer_config=TokenizerConfig(max_input_length=sample["context_length"] + 10),
+                tokenizer_config=TokenizerConfig(max_input_length=sample["context_length"] + 100),  # More buffer for safety
             )
             
             # Extract generated text

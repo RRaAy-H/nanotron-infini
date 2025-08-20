@@ -14,7 +14,9 @@ echo "================================================================="
 if [ $# -eq 0 ]; then
     echo "Error: No checkpoint path provided"
     echo "Usage: $0 <checkpoint_path> [additional_args...]"
+    echo "       $0 <checkpoint_path> --summary    # Quick summary test"
     echo "Example: $0 /data1/infini-attn/infini-llama/nanotron-infini/checkpoints/fineweb_4gpu_300m_infini/30000"
+    echo "         $0 /path/to/checkpoint --summary"
     exit 1
 fi
 
@@ -61,11 +63,18 @@ python -c "import sklearn; print('✓ scikit-learn available')" 2>/dev/null || {
 
 echo ""
 
-# Run the comprehensive test
-echo "Starting comprehensive memory analysis..."
-echo "================================================================="
-
-python scripts/test_memory_comprehensive.py --checkpoint "$CHECKPOINT_PATH" "$@"
+# Check if summary mode requested
+if [[ "$*" == *"--summary"* ]]; then
+    echo "Running quick summary test..."
+    echo "================================================================="
+    # Remove --summary from args and pass the rest
+    args_without_summary=$(echo "$@" | sed 's/--summary//')
+    python scripts/memory_summary_test.py --checkpoint "$CHECKPOINT_PATH" $args_without_summary
+else
+    echo "Starting comprehensive memory analysis..."
+    echo "================================================================="
+    python scripts/test_memory_comprehensive.py --checkpoint "$CHECKPOINT_PATH" "$@"
+fi
 
 exit_code=$?
 

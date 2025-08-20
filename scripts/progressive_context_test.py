@@ -458,10 +458,10 @@ class ProgressiveContextTester:
                 tokenizer=self.tokenizer,
                 model=self.model.model,
                 parallel_context=self.parallel_context,
-                max_new_tokens=15,
+                max_new_tokens=50,  # Increased for longer answers
                 max_micro_batch_size=1,
                 generation_config=GenerationArgs(sampler="greedy", use_cache=False),
-                tokenizer_config=TokenizerConfig(max_input_length=len(self.tokenizer.encode(full_prompt)) + 20),
+                tokenizer_config=TokenizerConfig(max_input_length=context_data['actual_length'] + 100),  # Use actual context length
             )
             
             response_time = time.time() - start_time

@@ -362,7 +362,7 @@ class MemoryContentAnalyzer:
                 max_new_tokens=1,  # Just need to process the context
                 max_micro_batch_size=1,
                 generation_config=GenerationArgs(sampler="greedy", use_cache=False),
-                tokenizer_config=TokenizerConfig(max_input_length=context_length + 10),
+                tokenizer_config=TokenizerConfig(max_input_length=context_length + 100),
             )
         except Exception as e:
             print(f"    Error processing document: {e}")
@@ -387,10 +387,10 @@ class MemoryContentAnalyzer:
                     tokenizer=self.tokenizer,
                     model=self.model.model,
                     parallel_context=self.parallel_context,
-                    max_new_tokens=10,
+                    max_new_tokens=50,  # Increased for longer answers
                     max_micro_batch_size=1,
                     generation_config=GenerationArgs(sampler="greedy", use_cache=False),
-                    tokenizer_config=TokenizerConfig(max_input_length=len(self.tokenizer.encode(retrieval_prompt)) + 10),
+                    tokenizer_config=TokenizerConfig(max_input_length=context_length + 100),  # Use context length limit
                 )
                 
                 # Analyze answer
