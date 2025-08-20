@@ -67,11 +67,26 @@ class MemoryUsageMonitor:
     def hook_memory_functions(self, model):
         """Hook into memory retrieval and update functions with working monitoring."""
         
+        print(f"🔧 Hooking memory functions...")
+        print(f"   Model type: {type(model)}")
+        print(f"   Has decoder: {hasattr(model, 'decoder')}")
+        if hasattr(model, 'decoder'):
+            print(f"   Decoder layers: {len(model.decoder)}")
+        
+        hooked_layers = 0
+        
         # Hook all decoder layers (but only log first layer for brevity)
         for layer_idx, layer in enumerate(model.decoder):
+            print(f"   Layer {layer_idx}: {type(layer)}")
+            print(f"     Has pp_block: {hasattr(layer, 'pp_block')}")
+            
             # Access attention through pp_block wrapper
             if hasattr(layer, 'pp_block') and hasattr(layer.pp_block, 'attn'):
                 attn_layer = layer.pp_block.attn
+                print(f"     ✅ Found attention layer: {type(attn_layer)}")
+                print(f"     Has _retrieve_from_memory: {hasattr(attn_layer, '_retrieve_from_memory')}")
+                print(f"     Has _update_memory: {hasattr(attn_layer, '_update_memory')}")
+                hooked_layers += 1
                 
                 # Store original functions
                 original_retrieve = attn_layer._retrieve_from_memory
@@ -90,12 +105,14 @@ class MemoryUsageMonitor:
                         }
                         self.retrieval_patterns.append(retrieval_info)
                         
-                        # Only print for first layer to avoid spam
+                        # Print for first layer to avoid spam
                         if layer_idx == 0:
                             if prev_memory is not None:
                                 print(f"💾 Layer {layer_idx}: Memory retrieval (norm: {retrieval_info['memory_norm']:.2f})")
                             else:
                                 print(f"🆕 Layer {layer_idx}: First segment - no previous memory")
+                        elif layer_idx < 3:  # Show first few layers for debugging
+                            print(f"🔄 Layer {layer_idx}: Memory retrieval ({'with' if prev_memory is not None else 'without'} prev memory)")
                         
                         # Call original function
                         return original_func(query_states, prev_memory, prev_normalization)
@@ -127,6 +144,15 @@ class MemoryUsageMonitor:
                 # Replace functions with monitored versions
                 attn_layer._retrieve_from_memory = create_monitored_retrieve(layer_idx, original_retrieve)
                 attn_layer._update_memory = create_monitored_update(layer_idx, original_update)
+            else:
+                print(f"     ❌ No attention layer found")
+        
+        print(f"🎯 Successfully hooked {hooked_layers} layers")
+        if hooked_layers == 0:
+            print("❌ NO LAYERS HOOKED - This explains why monitoring doesn't work!")
+            print("🔍 Model structure might be different than expected")
+        else:
+            print(f"✅ Monitoring hooks installed on {hooked_layers} layers")
     
     def analyze_segment_patterns(self, segment_length: int = 1024):
         """Analyze memory usage patterns by segment."""
@@ -373,11 +399,13 @@ def test_memory_usage(
         }
         
         for i, prompt in enumerate(test_prompts):
-            print(f"  Sample {i+1}/{num_samples}")
+            print(f"  Sample {i+1}/{num_samples} (prompt length: {len(tokenizer.encode(prompt))} tokens)")
             
             # Clear previous monitoring data
             monitor.memory_states.clear()
             monitor.retrieval_patterns.clear()
+            
+            print(f"    🚀 Starting decode_text...")
             
             # Generate response
             try:
@@ -392,8 +420,13 @@ def test_memory_usage(
                     tokenizer_config=TokenizerConfig(max_input_length=context_length),
                 )
                 
+                print(f"    ✅ decode_text completed")
+                
                 # Analyze this sample's memory usage
                 sample_report = monitor.generate_report()
+                
+                print(f"    📊 Memory activity: {sample_report['summary']['memory_retrievals']} retrievals, {len(monitor.memory_states)} updates")
+                
                 context_results['samples'].append({
                     'sample_id': i,
                     'prompt_length': len(tokenizer.encode(prompt)),
