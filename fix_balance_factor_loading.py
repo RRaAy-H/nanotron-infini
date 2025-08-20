@@ -20,7 +20,8 @@ def load_balance_factors_manually(model, checkpoint_path):
     print("=== MANUALLY LOADING BALANCE FACTORS ===")
     
     for layer_idx, layer in enumerate(model.model.decoder):
-        if hasattr(layer, 'attn') and hasattr(layer.attn, 'balance_factors'):
+        # Fix: Access through pp_block.attn instead of direct attn
+        if hasattr(layer, 'pp_block') and hasattr(layer.pp_block, 'attn') and hasattr(layer.pp_block.attn, 'balance_factors'):
             # Construct the checkpoint file path
             bf_file = checkpoint_path / f"model/model/decoder/{layer_idx}/pp_block/attn/model_balance_factors_pp-rank-0-of-1_tp-rank-0-of-1.safetensors"
             
@@ -34,13 +35,13 @@ def load_balance_factors_manually(model, checkpoint_path):
                         saved_bf = f.get_tensor('data')
                         
                         # Move to correct device and dtype
-                        target_device = layer.attn.balance_factors.device
-                        target_dtype = layer.attn.balance_factors.dtype
+                        target_device = layer.pp_block.attn.balance_factors.device
+                        target_dtype = layer.pp_block.attn.balance_factors.dtype
                         saved_bf = saved_bf.to(device=target_device, dtype=target_dtype)
                         
                         # Update model parameters
                         with torch.no_grad():
-                            layer.attn.balance_factors.data.copy_(saved_bf)
+                            layer.pp_block.attn.balance_factors.data.copy_(saved_bf)
                         
                         print(f"  ✅ Layer {layer_idx}: Loaded balance factors with mean={saved_bf.mean().item():.6f}, std={saved_bf.std().item():.6f}")
                     else:
@@ -48,7 +49,7 @@ def load_balance_factors_manually(model, checkpoint_path):
             else:
                 print(f"  ❌ Layer {layer_idx}: Balance factor file not found: {bf_file}")
         else:
-            print(f"  ❌ Layer {layer_idx}: No balance_factors attribute found")
+            print(f"  ❌ Layer {layer_idx}: No balance_factors attribute found at pp_block.attn")
     
     print("=== BALANCE FACTOR LOADING COMPLETE ===")
 
@@ -99,8 +100,8 @@ def test_balance_factor_fix():
     print("\n=== BEFORE ANY WEIGHT LOADING ===")
     for layer_idx in range(min(3, len(model.model.decoder))):
         layer = model.model.decoder[layer_idx]
-        if hasattr(layer, 'attn') and hasattr(layer.attn, 'balance_factors'):
-            bf = layer.attn.balance_factors.data
+        if hasattr(layer, 'pp_block') and hasattr(layer.pp_block, 'attn') and hasattr(layer.pp_block.attn, 'balance_factors'):
+            bf = layer.pp_block.attn.balance_factors.data
             print(f"Layer {layer_idx}: mean={bf.mean().item():.6f}, std={bf.std().item():.6f}")
     
     # APPLY OUR FIX FIRST (before standard loading to avoid parameter type issues)
@@ -110,8 +111,8 @@ def test_balance_factor_fix():
     print("\n=== AFTER MANUAL BALANCE FACTOR LOADING ===")
     for layer_idx in range(min(3, len(model.model.decoder))):
         layer = model.model.decoder[layer_idx]
-        if hasattr(layer, 'attn') and hasattr(layer.attn, 'balance_factors'):
-            bf = layer.attn.balance_factors.data
+        if hasattr(layer, 'pp_block') and hasattr(layer.pp_block, 'attn') and hasattr(layer.pp_block.attn, 'balance_factors'):
+            bf = layer.pp_block.attn.balance_factors.data
             print(f"Layer {layer_idx}: mean={bf.mean().item():.6f}, std={bf.std().item():.6f}")
     
     # Try loading standard weights (skip if it fails due to parameter type issues)
@@ -126,12 +127,12 @@ def test_balance_factor_fix():
     print("\n=== FINAL VERIFICATION (SHOULD BE FIXED!) ===")
     for layer_idx in range(min(3, len(model.model.decoder))):
         layer = model.model.decoder[layer_idx]
-        if hasattr(layer, 'attn') and hasattr(layer.attn, 'balance_factors'):
-            bf = layer.attn.balance_factors.data
+        if hasattr(layer, 'pp_block') and hasattr(layer.pp_block, 'attn') and hasattr(layer.pp_block.attn, 'balance_factors'):
+            bf = layer.pp_block.attn.balance_factors.data
             print(f"Layer {layer_idx}: mean={bf.mean().item():.6f}, std={bf.std().item():.6f}")
             
             # Test activation function
-            activated = layer.attn.balance_act_func(bf)
+            activated = layer.pp_block.attn.balance_act_func(bf)
             print(f"  After activation: mean={activated.mean().item():.6f}, range=[{activated.min().item():.6f}, {activated.max().item():.6f}]")
             
             # Determine if this layer prefers memory or attention
