@@ -318,7 +318,15 @@ def load_model_and_tokenizer(checkpoint_path: str):
     
     # Apply standalone balance factor fix (works around load_weights issues)
     print("🔧 Applying balance factor fix...")
-    sys.path.append('.')
+    
+    # Add root directory to Python path (more robust)
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.join(current_dir, '..')
+    root_dir = os.path.abspath(root_dir)
+    if root_dir not in sys.path:
+        sys.path.insert(0, root_dir)
+    
     from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
     
     # Apply the fix

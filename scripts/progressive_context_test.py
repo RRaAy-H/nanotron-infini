@@ -131,7 +131,15 @@ class ProgressiveContextTester:
         
         # Apply balance factor fix for Infini-Attention
         print("🔧 Applying balance factor fix...")
-        sys.path.append('.')
+        
+        # Add root directory to Python path (more robust)
+        import os
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.join(current_dir, '..')
+        root_dir = os.path.abspath(root_dir)
+        if root_dir not in sys.path:
+            sys.path.insert(0, root_dir)
+        
         try:
             from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
             fix_success = apply_balance_factor_fix_standalone(self.model, self.checkpoint_path, verbose=False)

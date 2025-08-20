@@ -759,7 +759,13 @@ def main():
     
     # Apply balance factor fix for Infini-Attention
     log_rank("🔧 Applying balance factor fix...", logger=logger, level=logging.INFO, rank=0)
-    sys.path.append('.')
+    
+    # Add root directory to Python path (current directory in this case)
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    if current_dir not in sys.path:
+        sys.path.insert(0, current_dir)
+    
     try:
         from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
         fix_success = apply_balance_factor_fix_standalone(model, checkpoint_path, verbose=False)
