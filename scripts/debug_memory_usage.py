@@ -65,83 +65,68 @@ class MemoryUsageMonitor:
         self.hooks = []
         
     def hook_memory_functions(self, model):
-        """Hook into memory retrieval and update functions."""
+        """Hook into memory retrieval and update functions with working monitoring."""
         
-        def create_retrieve_hook(layer_idx):
-            def retrieve_hook(query_states, prev_memory, prev_normalization):
-                # Record memory retrieval
-                if prev_memory is not None:
-                    memory_norm = prev_memory.norm().item()
-                    memory_shape = prev_memory.shape
-                    
-                    retrieval_info = {
-                        'layer_idx': layer_idx,
-                        'timestamp': time.time(),
-                        'memory_norm': memory_norm,
-                        'memory_shape': list(memory_shape),
-                        'has_memory': True
-                    }
-                else:
-                    retrieval_info = {
-                        'layer_idx': layer_idx,
-                        'timestamp': time.time(),
-                        'memory_norm': 0.0,
-                        'memory_shape': None,
-                        'has_memory': False
-                    }
-                
-                self.retrieval_patterns.append(retrieval_info)
-                return retrieval_info
-            return retrieve_hook
-        
-        def create_update_hook(layer_idx):
-            def update_hook(prev_memory, prev_normalization, key_states, value_states):
-                # Record memory update
-                key_norm = key_states.norm().item()
-                value_norm = value_states.norm().item()
-                
-                if prev_memory is not None:
-                    prev_memory_norm = prev_memory.norm().item()
-                else:
-                    prev_memory_norm = 0.0
-                
-                update_info = {
-                    'layer_idx': layer_idx,
-                    'timestamp': time.time(),
-                    'prev_memory_norm': prev_memory_norm,
-                    'key_norm': key_norm,
-                    'value_norm': value_norm
-                }
-                
-                self.memory_states.append(update_info)
-                return update_info
-            return update_hook
-        
-        # Hook all decoder layers
+        # Hook all decoder layers (but only log first layer for brevity)
         for layer_idx, layer in enumerate(model.model.decoder):
             # Access attention through pp_block wrapper
             if hasattr(layer, 'pp_block') and hasattr(layer.pp_block, 'attn'):
                 attn_layer = layer.pp_block.attn
+                
                 # Store original functions
                 original_retrieve = attn_layer._retrieve_from_memory
                 original_update = attn_layer._update_memory
                 
-                # Create monitoring wrapper
-                def monitored_retrieve(query_states, prev_memory, prev_normalization, layer_idx=layer_idx):
-                    # Record monitoring data
-                    create_retrieve_hook(layer_idx)(query_states, prev_memory, prev_normalization)
-                    # Call original function
-                    return original_retrieve(query_states, prev_memory, prev_normalization)
+                # Create monitoring wrapper that actually works
+                def create_monitored_retrieve(layer_idx, original_func):
+                    def monitored_retrieve(query_states, prev_memory, prev_normalization):
+                        # Record memory retrieval
+                        retrieval_info = {
+                            'layer_idx': layer_idx,
+                            'timestamp': time.time(),
+                            'has_memory': prev_memory is not None,
+                            'memory_norm': prev_memory.norm().item() if prev_memory is not None else 0.0,
+                            'memory_shape': list(prev_memory.shape) if prev_memory is not None else None
+                        }
+                        self.retrieval_patterns.append(retrieval_info)
+                        
+                        # Only print for first layer to avoid spam
+                        if layer_idx == 0:
+                            if prev_memory is not None:
+                                print(f"💾 Layer {layer_idx}: Memory retrieval (norm: {retrieval_info['memory_norm']:.2f})")
+                            else:
+                                print(f"🆕 Layer {layer_idx}: First segment - no previous memory")
+                        
+                        # Call original function
+                        return original_func(query_states, prev_memory, prev_normalization)
+                    return monitored_retrieve
                 
-                def monitored_update(prev_memory, prev_normalization, key_states, value_states, layer_idx=layer_idx):
-                    # Record monitoring data
-                    create_update_hook(layer_idx)(prev_memory, prev_normalization, key_states, value_states)
-                    # Call original function
-                    return original_update(prev_memory, prev_normalization, key_states, value_states)
+                def create_monitored_update(layer_idx, original_func):
+                    def monitored_update(prev_memory, prev_normalization, key_states, value_states):
+                        # Call original function to get updated memory
+                        new_memory, new_normalization = original_func(prev_memory, prev_normalization, key_states, value_states)
+                        
+                        # Record memory update
+                        update_info = {
+                            'layer_idx': layer_idx,
+                            'timestamp': time.time(),
+                            'prev_memory_norm': prev_memory.norm().item() if prev_memory is not None else 0.0,
+                            'new_memory_norm': new_memory.norm().item(),
+                            'key_norm': key_states.norm().item(),
+                            'value_norm': value_states.norm().item()
+                        }
+                        self.memory_states.append(update_info)
+                        
+                        # Only print for first layer to avoid spam
+                        if layer_idx == 0:
+                            print(f"🧠 Layer {layer_idx}: Memory update (new norm: {update_info['new_memory_norm']:.2f})")
+                        
+                        return new_memory, new_normalization
+                    return monitored_update
                 
                 # Replace functions with monitored versions
-                attn_layer._retrieve_from_memory = monitored_retrieve
-                attn_layer._update_memory = monitored_update
+                attn_layer._retrieve_from_memory = create_monitored_retrieve(layer_idx, original_retrieve)
+                attn_layer._update_memory = create_monitored_update(layer_idx, original_update)
     
     def analyze_segment_patterns(self, segment_length: int = 1024):
         """Analyze memory usage patterns by segment."""
