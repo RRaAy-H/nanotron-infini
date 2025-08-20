@@ -2332,6 +2332,19 @@ def main():
         rank=0,
     )
     load_weights(model=model, parallel_context=parallel_context, root_folder=checkpoint_path)
+    
+    # Apply balance factor fix for Infini-Attention
+    log_rank("🔧 Applying balance factor fix...", logger=logger, level=logging.INFO, rank=0)
+    sys.path.append('../..')
+    try:
+        from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
+        fix_success = apply_balance_factor_fix_standalone(model, checkpoint_path, verbose=False)
+        if fix_success:
+            log_rank("✅ Balance factors loaded successfully", logger=logger, level=logging.INFO, rank=0)
+        else:
+            log_rank("⚠️  Balance factor fix may not have worked properly", logger=logger, level=logging.WARNING, rank=0)
+    except Exception as e:
+        log_rank(f"⚠️  Balance factor fix failed: {e}", logger=logger, level=logging.WARNING, rank=0)
 
     model.eval()
     if AutoTokenizer is not None:

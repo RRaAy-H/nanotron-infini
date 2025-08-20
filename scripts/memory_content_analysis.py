@@ -158,6 +158,20 @@ class MemoryContentAnalyzer:
         
         mark_tied_parameters(model=self.model, parallel_context=self.parallel_context, parallel_config=parallel_config)
         load_weights(model=self.model, parallel_context=self.parallel_context, root_folder=self.checkpoint_path)
+        
+        # Apply balance factor fix for Infini-Attention
+        print("🔧 Applying balance factor fix...")
+        sys.path.append('.')
+        try:
+            from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
+            fix_success = apply_balance_factor_fix_standalone(self.model, self.checkpoint_path, verbose=False)
+            if fix_success:
+                print("✅ Balance factors loaded successfully")
+            else:
+                print("⚠️  Balance factor fix may not have worked properly")
+        except Exception as e:
+            print(f"⚠️  Balance factor fix failed: {e}")
+        
         self.model.eval()
         
         # Load tokenizer

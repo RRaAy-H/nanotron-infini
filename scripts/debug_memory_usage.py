@@ -316,19 +316,24 @@ def load_model_and_tokenizer(checkpoint_path: str):
     # Mark tied parameters
     mark_tied_parameters(model=model, parallel_context=parallel_context, parallel_config=parallel_config)
     
-    # Load weights (balance factors now load automatically with permanent fix)
-    load_weights(model=model, parallel_context=parallel_context, root_folder=checkpoint_path)
-    model.eval()
+    # Apply standalone balance factor fix (works around load_weights issues)
+    print("🔧 Applying balance factor fix...")
+    sys.path.append('.')
+    from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
     
-    # Verify balance factors loaded correctly
-    layer0 = model.model.decoder[0]
-    if hasattr(layer0, 'pp_block') and hasattr(layer0.pp_block, 'attn') and hasattr(layer0.pp_block.attn, 'balance_factors'):
-        bf = layer0.pp_block.attn.balance_factors.data
-        if bf.std().item() > 0.1:
+    # Apply the fix
+    fix_success = apply_balance_factor_fix_standalone(model, args.checkpoint, verbose=False)
+    
+    if fix_success:
+        layer0 = model.model.decoder[0]
+        if hasattr(layer0, 'pp_block') and hasattr(layer0.pp_block, 'attn') and hasattr(layer0.pp_block.attn, 'balance_factors'):
+            bf = layer0.pp_block.attn.balance_factors.data
             activated = layer0.pp_block.attn.balance_act_func(bf)
-            print(f"✅ Balance factors loaded automatically: Layer 0 using {activated.mean().item()*100:.1f}% memory")
-        else:
-            print("⚠️  Balance factors may not be loaded properly")
+            print(f"✅ Balance factors loaded successfully: Layer 0 using {activated.mean().item()*100:.1f}% memory")
+    else:
+        print("❌ Balance factor fix failed - memory tests may not work correctly")
+    
+    model.eval()
     
     # Load tokenizer
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
