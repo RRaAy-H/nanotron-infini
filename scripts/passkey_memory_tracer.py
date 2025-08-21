@@ -482,21 +482,37 @@ def load_model_and_tokenizer(checkpoint_path):
     model_config.turn_on_memory = True  # Ensure memory is enabled
     
     # Get the correct model class from config
-    model_type = config.model.model_config.model_type if hasattr(config.model.model_config, 'model_type') else config.model.init_method.split(".")[-1].lower()
+    model_type = None
     
-    # Handle different possible model type names
-    if model_type not in CONFIG_TO_MODEL_CLASS:
-        if "llama" in str(model_type).lower():
+    # Try different ways to determine model type
+    if hasattr(config.model.model_config, 'model_type'):
+        model_type = config.model.model_config.model_type
+    elif hasattr(config.model.model_config, '__class__'):
+        # Get model type from class name
+        class_name = config.model.model_config.__class__.__name__
+        if "llama" in class_name.lower():
             model_type = "llama"
-        elif hasattr(config.model.model_config, '__class__'):
-            # Try to get model type from class name
-            class_name = config.model.model_config.__class__.__name__.lower()
-            if "llama" in class_name:
-                model_type = "llama"
+        else:
+            model_type = class_name.replace("Config", "").lower()
+    
+    # Handle different possible model type names and ensure it exists in CONFIG_TO_MODEL_CLASS
+    if model_type is None or model_type not in CONFIG_TO_MODEL_CLASS:
+        if model_type and "llama" in str(model_type).lower():
+            model_type = "llama"
+        else:
+            # Check available model classes and pick the best match
+            available_classes = list(CONFIG_TO_MODEL_CLASS.keys())
+            print(f"Available model classes: {available_classes}")
+            
+            # Try to find llama-related class
+            llama_classes = [cls for cls in available_classes if "llama" in cls.lower()]
+            if llama_classes:
+                model_type = llama_classes[0]
+                print(f"Using llama-related model class: {model_type}")
             else:
-                # Default fallback - try the first available model class
-                model_type = list(CONFIG_TO_MODEL_CLASS.keys())[0]
-                print(f"Warning: Unknown model type, using {model_type}")
+                # Default fallback - use the first available model class
+                model_type = available_classes[0]
+                print(f"Warning: Using default model class: {model_type}")
     
     model = build_model(
         model_config=model_config,
