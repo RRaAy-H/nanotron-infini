@@ -495,24 +495,24 @@ def load_model_and_tokenizer(checkpoint_path):
         else:
             model_type = class_name.replace("Config", "").lower()
     
-    # Handle different possible model type names and ensure it exists in CONFIG_TO_MODEL_CLASS
+    # Check available model classes and pick the best match
+    available_classes = list(CONFIG_TO_MODEL_CLASS.keys())
+    print(f"Available model classes: {available_classes}")
+    print(f"Detected model type: {model_type}")
+    
+    # Ensure model_type exists in CONFIG_TO_MODEL_CLASS
     if model_type is None or model_type not in CONFIG_TO_MODEL_CLASS:
-        if model_type and "llama" in str(model_type).lower():
-            model_type = "llama"
+        # Try to find llama-related class
+        llama_classes = [cls for cls in available_classes if "llama" in cls.lower()]
+        if llama_classes:
+            model_type = llama_classes[0]
+            print(f"Using llama-related model class: {model_type}")
         else:
-            # Check available model classes and pick the best match
-            available_classes = list(CONFIG_TO_MODEL_CLASS.keys())
-            print(f"Available model classes: {available_classes}")
-            
-            # Try to find llama-related class
-            llama_classes = [cls for cls in available_classes if "llama" in cls.lower()]
-            if llama_classes:
-                model_type = llama_classes[0]
-                print(f"Using llama-related model class: {model_type}")
-            else:
-                # Default fallback - use the first available model class
-                model_type = available_classes[0]
-                print(f"Warning: Using default model class: {model_type}")
+            # Default fallback - use the first available model class
+            model_type = available_classes[0]
+            print(f"Warning: Using default model class: {model_type}")
+    
+    print(f"Final model type: {model_type}")
     
     model = build_model(
         model_config=model_config,
