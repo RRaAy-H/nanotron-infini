@@ -254,6 +254,9 @@ def get_args():
 def main():
     args = get_args()
     
+    # Initialize distributed environment first (required for log_rank)
+    dist.initialize_torch_distributed()
+    
     log_rank("Enhanced Passkey Evaluation with Memory Monitoring", logger=logger, level=logging.INFO, rank=0)
     log_rank("=" * 60, logger=logger, level=logging.INFO, rank=0)
     
