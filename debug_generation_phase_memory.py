@@ -192,19 +192,32 @@ def setup_phase_monitoring(model, monitor):
     for layer_idx, layer in enumerate(model.model.decoder):
         attn_layer = layer.pp_block.attn
         
-        # Hook update function
-        update_hook = attn_layer._update_memory.register_forward_hook(
-            monitor.hook_memory_update(layer_idx), 
-            with_kwargs=True
-        )
-        hooks.append(update_hook)
+        # Store original methods
+        original_update = attn_layer._update_memory
+        original_retrieve = attn_layer._retrieve_from_memory
         
-        # Hook retrieve function  
-        retrieve_hook = attn_layer._retrieve_from_memory.register_forward_hook(
-            monitor.hook_memory_retrieve(layer_idx),
-            with_kwargs=True
-        )
-        hooks.append(retrieve_hook)
+        # Wrap memory functions with monitoring
+        def create_update_wrapper(layer_idx, original_fn):
+            def wrapped_update(*args, **kwargs):
+                result = original_fn(*args, **kwargs)
+                monitor.hook_memory_update(layer_idx)(None, args, kwargs, result)
+                return result
+            return wrapped_update
+            
+        def create_retrieve_wrapper(layer_idx, original_fn):
+            def wrapped_retrieve(*args, **kwargs):
+                result = original_fn(*args, **kwargs)
+                monitor.hook_memory_retrieve(layer_idx)(None, args, kwargs, result)
+                return result
+            return wrapped_retrieve
+        
+        # Replace methods with wrapped versions
+        attn_layer._update_memory = create_update_wrapper(layer_idx, original_update)
+        attn_layer._retrieve_from_memory = create_retrieve_wrapper(layer_idx, original_retrieve)
+        
+        # Store cleanup info
+        hooks.append((attn_layer, '_update_memory', original_update))
+        hooks.append((attn_layer, '_retrieve_from_memory', original_retrieve))
         
     print(f"SUCCESS: Phase monitoring active on {len(model.model.decoder)} layers")
     return hooks
@@ -351,9 +364,9 @@ def test_passkey_phases(model, tokenizer, parallel_context, checkpoint_path):
         return results
         
     finally:
-        # Clean up hooks
-        for hook in hooks:
-            hook.remove()
+        # Clean up hooks - restore original methods
+        for attn_layer, method_name, original_method in hooks:
+            setattr(attn_layer, method_name, original_method)
 
 def main():
     parser = argparse.ArgumentParser(description="Debug memory usage during generation phases")
