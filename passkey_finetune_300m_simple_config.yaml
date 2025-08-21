@@ -2,8 +2,8 @@ general:
   benchmark_csv_path: null
   consumed_train_samples: null
   ignore_sanity_checks: true
-  project: null
-  run: null
+  project: llama_300m_passkey_finetune_optimized
+  run: 300m_passkey_optimized_memory_retrieval
   seed: 42
   step: null
 
@@ -16,7 +16,7 @@ infini_attention:
   balance_init_type: zeros
   logging: true
   logging_interval: 25
-  log_grad: true
+  log_grad: false
   log_segment_acts: true
   balance_factor_weight_decay: 0.0
 
