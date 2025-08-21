@@ -267,10 +267,11 @@ def main():
     model_config = config.model.model_config
     tokenizer_path = config.tokenizer.tokenizer_name_or_path
     
+    # For single-process inference, override parallelism to all 1s
     parallel_config = ParallelismArgs(
-        dp=args.dp or config.parallelism.dp,
-        pp=args.pp or config.parallelism.pp,
-        tp=args.tp or config.parallelism.tp,
+        dp=args.dp or 1,  # Force dp=1 for single process
+        pp=args.pp or 1,  # Force pp=1 for single process  
+        tp=args.tp or 1,  # Force tp=1 for single process
         pp_engine=OneForwardOneBackwardPipelineEngine(),
         tp_mode=TensorParallelLinearMode.ALL_REDUCE,
         tp_linear_async_communication=False,
