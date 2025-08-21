@@ -44,14 +44,14 @@ class MemoryUsageMonitor:
         
     def hook_memory_functions(self, model):
         """Hook memory functions using the CORRECT pipeline block execution path."""
-        print("🔧 Hooking memory functions with CORRECT execution path...")
+        print("Hooking memory functions with CORRECT execution path...")
         
         # Get the actual model (unwrap LlamaForTraining if needed)
         actual_model = model.model if hasattr(model, 'model') else model
         print(f"   Model type: {type(actual_model)}")
         
         if not hasattr(actual_model, 'decoder'):
-            print(f"   ❌ Model has no decoder attribute")
+            print(f"   ERROR: Model has no decoder attribute")
             return
             
         print(f"   Decoder layers: {len(actual_model.decoder)}")
@@ -62,7 +62,7 @@ class MemoryUsageMonitor:
             
             if hasattr(pipeline_block, 'pp_block') and hasattr(pipeline_block.pp_block, 'attn'):
                 attn_layer = pipeline_block.pp_block.attn
-                print(f"     ✅ Found attention layer: {type(attn_layer)}")
+                print(f"     SUCCESS: Found attention layer: {type(attn_layer)}")
                 
                 if hasattr(attn_layer, '_retrieve_from_memory') and hasattr(attn_layer, '_update_memory'):
                     # Save original methods
@@ -78,7 +78,7 @@ class MemoryUsageMonitor:
                                 has_memory = prev_memory is not None
                                 memory_norm = prev_memory.norm().item() if has_memory else 0.0
                                 
-                                print(f"    🧠 Layer {layer_idx}: Memory retrieve #{self.memory_calls['retrieve']} "
+                                print(f"    Layer {layer_idx}: Memory retrieve #{self.memory_calls['retrieve']} "
                                       f"(prev_memory: {'Yes' if has_memory else 'No'}, norm: {memory_norm:.3f})")
                                 
                                 self.memory_stats.append({
@@ -100,8 +100,8 @@ class MemoryUsageMonitor:
                                 new_memory, new_normalization = result
                                 new_norm = new_memory.norm().item()
                                 
-                                print(f"    💾 Layer {layer_idx}: Memory update #{self.memory_calls['update']} "
-                                      f"(prev: {prev_norm:.3f} → new: {new_norm:.3f})")
+                                print(f"    Layer {layer_idx}: Memory update #{self.memory_calls['update']} "
+                                      f"(prev: {prev_norm:.3f} -> new: {new_norm:.3f})")
                                 
                                 self.memory_stats.append({
                                     'type': 'update',
@@ -134,11 +134,11 @@ class MemoryUsageMonitor:
                     pipeline_block.forward = create_monitored_forward(layer_idx)
                     self.hooked_blocks.append((layer_idx, pipeline_block, original_forward))
                 else:
-                    print(f"     ❌ No memory functions found")
+                    print(f"     ERROR: No memory functions found")
             else:
-                print(f"     ❌ No attention layer found")
+                print(f"     ERROR: No attention layer found")
         
-        print(f"✅ Successfully hooked {len(self.hooked_blocks)} pipeline blocks")
+        print(f"SUCCESS: Successfully hooked {len(self.hooked_blocks)} pipeline blocks")
         
     def reset_counters(self):
         """Reset monitoring counters."""
@@ -206,9 +206,9 @@ def load_model_and_tokenizer(checkpoint_path: Path):
     from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
     fix_success = apply_balance_factor_fix_standalone(model, checkpoint_path, verbose=False)
     if fix_success:
-        print("✅ Balance factors loaded successfully")
+        print("SUCCESS: Balance factors loaded successfully")
     else:
-        print("⚠️  Balance factor fix may not have worked properly")
+        print("WARNING: Balance factor fix may not have worked properly")
     
     model.eval()
     
@@ -245,7 +245,7 @@ def test_memory_usage(model, tokenizer, parallel_context, context_lengths, num_s
             
             try:
                 # Run decode_text
-                print(f"    🚀 Starting decode_text...")
+                print(f"    Starting decode_text...")
                 outputs = list(decode_text(
                     input_iter=[GenerationInput(text=prompt_text)],
                     tokenizer=tokenizer,
@@ -256,11 +256,11 @@ def test_memory_usage(model, tokenizer, parallel_context, context_lengths, num_s
                     generation_config=GenerationArgs(sampler="greedy", use_cache=False),
                     tokenizer_config=TokenizerConfig(max_input_length=context_length + 100),
                 ))
-                print(f"    ✅ decode_text completed")
+                print(f"    decode_text completed")
                 
                 # Get results
                 summary = monitor.get_summary()
-                print(f"    📊 Memory activity: {summary['total_retrievals']} retrievals, {summary['total_updates']} updates")
+                print(f"    Memory activity: {summary['total_retrievals']} retrievals, {summary['total_updates']} updates")
                 
                 results[context_length].append({
                     'sample_id': sample_idx,
@@ -270,7 +270,7 @@ def test_memory_usage(model, tokenizer, parallel_context, context_lengths, num_s
                 })
                 
             except Exception as e:
-                print(f"    ❌ Error: {e}")
+                print(f"    ERROR: {e}")
                 results[context_length].append({
                     'sample_id': sample_idx,
                     'error': str(e),
@@ -300,7 +300,7 @@ def main():
     
     checkpoint_path = Path(args.checkpoint)
     if not checkpoint_path.exists():
-        print(f"❌ Checkpoint path does not exist: {checkpoint_path}")
+        print(f"ERROR: Checkpoint path does not exist: {checkpoint_path}")
         return
     
     print("Loading model and tokenizer...")
@@ -330,13 +330,13 @@ def main():
     print("=" * 50)
     
     if total_retrievals > 0 or total_updates > 0:
-        print(f"Memory Mechanism Status: ✅ WORKING PERFECTLY!")
+        print(f"Memory Mechanism Status: WORKING PERFECTLY!")
         print(f"Total Memory Retrievals: {total_retrievals}")
         print(f"Total Memory Updates: {total_updates}")
-        print(f"Cross-Segment Capability: ✅ Confirmed")
-        print(f"Effectiveness Rating: 🎉 FULLY FUNCTIONAL")
+        print(f"Cross-Segment Capability: Confirmed")
+        print(f"Effectiveness Rating: FULLY FUNCTIONAL")
     else:
-        print(f"Memory Mechanism Status: ❌ Not working - check implementation")
+        print(f"Memory Mechanism Status: Not working - check implementation")
         print(f"Total Memory Retrievals: {total_retrievals}")
         print(f"Total Memory Updates: {total_updates}")
     
