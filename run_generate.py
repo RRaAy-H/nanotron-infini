@@ -796,7 +796,7 @@ def main():
         tokenizer.padding_side = "left"
         tokenizer.truncation_side = "left"  # TODO @nouamane: do we want this?
         dummy_inputs = [
-            NEEDLE_TEXT_16K_CTX_AND_0_DEPTH,
+            AI_TEXT_16K,
             # "Passage: Daniel went back to the garden. Mary travelled to the kitchen. Sandra journeyed to the kitchen. Sandra went to the hallway. John went to the bedroom. Mary went back to the garden. Daniel walked to the living room. Sandra moved to the dining room. John traveled to the kitchen. Daniel journeyed to the hallway. Where is Mary?\nAnswer:",
             # "Passage: Daniel went back to the garden. Mary travelled to the kitchen. Sandra journeyed to the kitchen. Sandra went to the hallway. John went to the bedroom. Mary went back to the garden. Where is Mary? Mary is in ",
             # """
