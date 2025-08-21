@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Test memory retrieval with forced question phase detection.
-This bypasses the question detection issue and forces retrieval during generation.
+Simple memory content inspection to see what's actually being retrieved.
 """
 
 import sys
@@ -25,7 +24,6 @@ from nanotron.serialize.weights import load_weights
 from transformers import AutoTokenizer
 import torch.distributed as dist
 import argparse
-from collections import defaultdict
 
 # Import balance factor fix
 try:
@@ -34,44 +32,78 @@ except ImportError:
     sys.path.append('.')
     from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
 
-class ForcedRetrievalTester:
-    def __init__(self, passkey):
-        self.passkey = passkey
-        self.storage_events = 0
-        self.retrieval_events = 0
-        self.generation_phase = False  # Track if we're in generation
-        self.context_processed = False
+class MemoryContentInspector:
+    def __init__(self):
+        self.retrieved_memories = []
+        self.stored_memories = []
         
     def hook_memory_update(self, layer_idx, original_fn):
         def wrapped_update(*args, **kwargs):
             result = original_fn(*args, **kwargs)
-            self.storage_events += 1
             
-            phase = "generation" if self.generation_phase else "context"
-            print(f"[STORE] Layer {layer_idx} | Phase: {phase}")
+            if len(result) >= 2:
+                memory, norm = result[0], result[1]
+                if memory is not None:
+                    # Store a sample of the memory for inspection
+                    self.stored_memories.append({
+                        'layer': layer_idx,
+                        'memory_sample': memory[:4, :4].detach().cpu(),  # Small sample
+                        'norm': norm.mean().item() if norm.numel() > 1 else norm.item(),
+                        'shape': list(memory.shape)
+                    })
+                    print(f"[STORE] Layer {layer_idx} | Shape: {memory.shape} | Norm: {norm.mean().item():.1f}")
+            
             return result
         return wrapped_update
-        
+    
     def hook_memory_retrieve(self, layer_idx, original_fn):
         def wrapped_retrieve(*args, **kwargs):
             result = original_fn(*args, **kwargs)
-            self.retrieval_events += 1
             
-            phase = "generation" if self.generation_phase else "context"
-            print(f"[RETRIEVE] Layer {layer_idx} | Phase: {phase}")
+            if len(result) >= 2:
+                retrieved, norm = result[0], result[1]
+                if retrieved is not None:
+                    # Store retrieved memory for inspection
+                    self.retrieved_memories.append({
+                        'layer': layer_idx,
+                        'retrieved_sample': retrieved[:4, :4].detach().cpu(),  # Small sample
+                        'norm': norm.mean().item() if norm.numel() > 1 else norm.item(),
+                        'shape': list(retrieved.shape)
+                    })
+                    print(f"[RETRIEVE] Layer {layer_idx} | Shape: {retrieved.shape} | Norm: {norm.mean().item():.1f}")
+            
             return result
         return wrapped_retrieve
     
-    def start_generation_phase(self):
-        """Manually mark start of generation phase"""
-        self.generation_phase = True
-        self.context_processed = True
-        print("\n" + "="*50)
-        print("SWITCHING TO GENERATION PHASE")
-        print("="*50)
+    def analyze_content_similarity(self):
+        """Analyze similarity between stored and retrieved memories"""
+        if not self.stored_memories or not self.retrieved_memories:
+            return "No memory content to analyze"
+        
+        print(f"\nMemory Content Analysis:")
+        print(f"Stored memories: {len(self.stored_memories)}")
+        print(f"Retrieved memories: {len(self.retrieved_memories)}")
+        
+        # Compare some samples
+        if len(self.stored_memories) > 0 and len(self.retrieved_memories) > 0:
+            stored_sample = self.stored_memories[-1]['memory_sample']
+            retrieved_sample = self.retrieved_memories[-1]['retrieved_sample']
+            
+            print(f"\nLast stored memory sample (layer {self.stored_memories[-1]['layer']}):")
+            print(stored_sample)
+            
+            print(f"\nLast retrieved memory sample (layer {self.retrieved_memories[-1]['layer']}):")
+            print(retrieved_sample)
+            
+            # Simple similarity check
+            try:
+                similarity = torch.cosine_similarity(stored_sample.flatten(), retrieved_sample.flatten(), dim=0)
+                print(f"\nSimilarity: {similarity.item():.3f}")
+            except:
+                print("\nCould not compute similarity (shape mismatch)")
 
 def load_model_and_tokenizer(checkpoint_path):
-    """Load model with forced retrieval testing"""
+    """Load model and tokenizer"""
     print("Loading model and tokenizer...")
     
     # Apply llama.py fix
@@ -155,10 +187,10 @@ def load_model_and_tokenizer(checkpoint_path):
     
     return model, tokenizer, parallel_context
 
-def test_forced_retrieval(checkpoint_path, passkey="567890"):
-    """Test memory retrieval by forcing question phase detection"""
+def simple_passkey_test(checkpoint_path, passkey="123456"):
+    """Simple test to inspect memory content"""
     
-    print("Forced Memory Retrieval Test")
+    print("Memory Content Inspection Test")
     print("="*40)
     print(f"Checkpoint: {checkpoint_path}")
     print(f"Passkey: {passkey}")
@@ -166,32 +198,19 @@ def test_forced_retrieval(checkpoint_path, passkey="567890"):
     # Load model
     model, tokenizer, parallel_context = load_model_and_tokenizer(checkpoint_path)
     
-    # Create test context
-    context = (
-        "This research paper discusses advanced computational methods. "
-        "The experimental setup involved multiple stages of analysis. "
-        "Data collection was performed over several months. "
-    ) * 8  # Substantial context
+    # Simple test case
+    text = f"The password is {passkey}. What is the password?"
     
-    context += f"The access verification code is {passkey}. This code is critical for authentication. "
-    context += (
-        "Additional experimental details follow. The methodology was rigorously tested. "
-        "Results were validated through multiple approaches. "
-    ) * 3
+    print(f"\nTest text: '{text}'")
+    print(f"Text length: {len(text)} characters")
     
-    question = "What is the access verification code mentioned earlier?"
-    full_text = context + question
+    # Initialize inspector
+    inspector = MemoryContentInspector()
     
-    print(f"\nTest setup:")
-    print(f"Context length: {len(full_text)} characters")
-    print(f"Estimated tokens: ~{len(full_text.split())}")
-    
-    # Initialize tester
-    tester = ForcedRetrievalTester(passkey)
-    
-    # Setup memory monitoring
+    # Setup memory monitoring on just a few layers
     original_methods = []
-    for layer_idx, layer in enumerate(model.model.decoder):
+    for layer_idx in [0, 1, 2]:  # Monitor first 3 layers only
+        layer = model.model.decoder[layer_idx]
         attn_layer = layer.pp_block.attn
         
         # Store original methods
@@ -200,44 +219,25 @@ def test_forced_retrieval(checkpoint_path, passkey="567890"):
         original_methods.append((attn_layer, original_update, original_retrieve))
         
         # Replace with monitoring versions
-        attn_layer._update_memory = tester.hook_memory_update(layer_idx, original_update)
-        attn_layer._retrieve_from_memory = tester.hook_memory_retrieve(layer_idx, original_retrieve)
+        attn_layer._update_memory = inspector.hook_memory_update(layer_idx, original_update)
+        attn_layer._retrieve_from_memory = inspector.hook_memory_retrieve(layer_idx, original_retrieve)
     
     try:
-        print(f"\nPhase 1: Context Processing (Storage)")
-        print("-" * 40)
-        
-        # Process context (this should trigger storage)
-        context_start = time.time()
-        
-        # Create generation input
-        generation_input = GenerationInput(text=full_text)
-        
-        # Custom generation loop with phase control
-        print("Starting generation with forced phase detection...")
-        
-        # After some processing, force switch to generation phase
-        def switch_to_generation():
-            tester.start_generation_phase()
-        
-        # Use a timer to switch phases during generation
-        import threading
-        timer = threading.Timer(2.0, switch_to_generation)  # Switch after 2 seconds
-        timer.start()
+        print(f"\nStarting generation with memory content monitoring...")
+        start_time = time.time()
         
         outputs = list(decode_text(
-            input_iter=[generation_input],
+            input_iter=[GenerationInput(text=text)],
             tokenizer=tokenizer,
             model=model.model,
             parallel_context=parallel_context,
-            max_new_tokens=20,
+            max_new_tokens=10,
             max_micro_batch_size=1,
             generation_config=GenerationArgs(sampler="greedy", use_cache=False),
-            tokenizer_config=TokenizerConfig(max_input_length=len(full_text) + 100),
+            tokenizer_config=TokenizerConfig(max_input_length=len(text) + 50),
         ))
         
-        timer.cancel()  # Cancel timer if generation finishes first
-        generation_time = time.time() - context_start
+        generation_time = time.time() - start_time
         
         # Extract answer
         answer = "No output"
@@ -264,9 +264,9 @@ def test_forced_retrieval(checkpoint_path, passkey="567890"):
                     print(f"Error extracting answer: {e}")
                     answer = str(output)
         
-        print(f"\n{'='*50}")
-        print("FORCED RETRIEVAL TEST RESULTS")
-        print(f"{'='*50}")
+        print(f"\n{'='*40}")
+        print("MEMORY CONTENT INSPECTION RESULTS")
+        print(f"{'='*40}")
         
         print(f"\nTask Results:")
         print(f"Generated Answer: '{answer}'")
@@ -274,44 +274,37 @@ def test_forced_retrieval(checkpoint_path, passkey="567890"):
         print(f"Success: {'YES' if passkey in answer else 'NO'}")
         print(f"Generation Time: {generation_time:.2f}s")
         
-        print(f"\nMemory Activity:")
-        print(f"Storage Events: {tester.storage_events}")
-        print(f"Retrieval Events: {tester.retrieval_events}")
-        print(f"Storage/Retrieval Ratio: {tester.storage_events/max(tester.retrieval_events, 1):.1f}")
+        # Analyze memory content
+        inspector.analyze_content_similarity()
         
-        if tester.retrieval_events > 0:
-            print("\n✅ SUCCESS: Memory retrieval detected!")
-            print("   → Memory mechanism works when phase is correctly detected")
+        print(f"\n{'='*40}")
+        print("ASSESSMENT:")
+        
+        if len(inspector.retrieved_memories) > 0:
+            print("✅ Memory retrieval is happening!")
+            
+            # Check if we're getting different memories
+            stored_norms = [m['norm'] for m in inspector.stored_memories]
+            retrieved_norms = [m['norm'] for m in inspector.retrieved_memories]
+            
+            print(f"Stored memory norms: {stored_norms[:5]}...")  # First 5
+            print(f"Retrieved memory norms: {retrieved_norms[:5]}...")  # First 5
+            
             if passkey in answer:
-                print("   → Passkey successfully retrieved from memory!")
+                print("🎯 SUCCESS: Memory retrieval working and passkey retrieved!")
             else:
-                print("   → Memory active but passkey not in output (integration issue)")
+                print("⚠️  Memory retrieval working but wrong content retrieved")
+                print("   → The retrieved memory doesn't contain the passkey")
+                print("   → Model might need better training on passkey tasks")
         else:
-            print("\n❌ ISSUE: Still no memory retrieval")
-            print("   → Deeper generation logic issue")
-        
-        # Test with manual memory forcing
-        print(f"\nPhase 2: Manual Memory Access Test")
-        print("-" * 40)
-        
-        # Try to manually access stored memories
-        print("Checking if memories contain passkey information...")
-        
-        for layer_idx, layer in enumerate(model.model.decoder):
-            attn_layer = layer.pp_block.attn
-            if hasattr(attn_layer, 'memory') and attn_layer.memory is not None:
-                memory_norm = attn_layer.memory.norm().item()
-                print(f"Layer {layer_idx}: Memory norm = {memory_norm:.1f}")
-            else:
-                print(f"Layer {layer_idx}: No memory state found")
+            print("❌ No memory retrieval detected")
         
         return {
             'success': passkey in answer,
             'answer': answer,
-            'storage_events': tester.storage_events,
-            'retrieval_events': tester.retrieval_events,
-            'generation_time': generation_time,
-            'forced_retrieval_worked': tester.retrieval_events > 0
+            'stored_count': len(inspector.stored_memories),
+            'retrieved_count': len(inspector.retrieved_memories),
+            'generation_time': generation_time
         }
         
     finally:
@@ -321,21 +314,27 @@ def test_forced_retrieval(checkpoint_path, passkey="567890"):
             attn_layer._retrieve_from_memory = original_retrieve
 
 def main():
-    parser = argparse.ArgumentParser(description="Test forced memory retrieval")
+    parser = argparse.ArgumentParser(description="Inspect memory content")
     parser.add_argument("--checkpoint", required=True, help="Path to checkpoint")
-    parser.add_argument("--passkey", default="567890", help="Passkey to test with")
+    parser.add_argument("--passkey", default="654321", help="Passkey to test with")
     
     args = parser.parse_args()
     
-    result = test_forced_retrieval(args.checkpoint, args.passkey)
+    result = simple_passkey_test(args.checkpoint, args.passkey)
     
-    print(f"\n🎯 Final Assessment:")
-    if result['forced_retrieval_worked']:
-        print("✅ Memory retrieval mechanism WORKS when properly triggered!")
-        print("📝 Next step: Fix question detection in generation pipeline")
+    print(f"\n🔍 Conclusion:")
+    if result['retrieved_count'] > 0:
+        print("✅ Memory mechanism is active during generation")
+        if result['success']:
+            print("🎯 Memory content is correct - passkey successfully retrieved!")
+        else:
+            print("❌ Memory content issue - wrong information being retrieved")
+            print("💡 Possible solutions:")
+            print("   1. Improve training data for passkey tasks")
+            print("   2. Adjust balance factors to favor memory more")
+            print("   3. Increase memory capacity or context length")
     else:
-        print("❌ Memory retrieval still not working - deeper issue")
-        print("📝 Next step: Investigate generation logic more deeply")
+        print("❌ Memory retrieval not working")
 
 if __name__ == "__main__":
     main()
