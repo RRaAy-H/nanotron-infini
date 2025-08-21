@@ -19,7 +19,6 @@ infini_attention:
   log_grad: true
   log_segment_acts: true
   balance_factor_weight_decay: 0.0
-  memory_regularization: 0.001
 
 # Model Configuration
 model:
