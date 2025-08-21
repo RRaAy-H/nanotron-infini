@@ -193,7 +193,7 @@ def test_call_vs_forward():
         outputs = list(decode_text(
             input_iter=[GenerationInput(text=prompt_text)],
             tokenizer=tokenizer,
-            model=model,  # Note: Pass the full model, not model.model
+            model=model.model,  # Pass the actual LlamaModel, not LlamaForTraining wrapper
             parallel_context=parallel_context,
             max_new_tokens=3,
             max_micro_batch_size=1,
