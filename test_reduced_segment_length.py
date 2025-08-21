@@ -37,17 +37,17 @@ class SegmentLengthTester:
     def __init__(self):
         self.memory_operations = defaultdict(int)
         
-    def hook_memory_update(self, layer_idx):
+    def hook_memory_update(self, layer_idx, original_fn):
         def wrapped_update(*args, **kwargs):
-            result = args[0]._original_update_memory(*args[1:], **kwargs)
+            result = original_fn(*args, **kwargs)
             self.memory_operations[f'layer_{layer_idx}_updates'] += 1
             print(f"Layer {layer_idx}: Memory UPDATE")
             return result
         return wrapped_update
         
-    def hook_memory_retrieve(self, layer_idx):
+    def hook_memory_retrieve(self, layer_idx, original_fn):
         def wrapped_retrieve(*args, **kwargs):
-            result = args[0]._original_retrieve_memory(*args[1:], **kwargs)
+            result = original_fn(*args, **kwargs)
             self.memory_operations[f'layer_{layer_idx}_retrievals'] += 1
             print(f"Layer {layer_idx}: Memory RETRIEVE")
             return result
@@ -157,10 +157,8 @@ def test_segment_length(checkpoint_path, segment_length):
         original_methods.append((attn_layer, original_update, original_retrieve))
         
         # Replace with monitoring versions
-        attn_layer._original_update_memory = original_update
-        attn_layer._original_retrieve_memory = original_retrieve
-        attn_layer._update_memory = tester.hook_memory_update(layer_idx)
-        attn_layer._retrieve_from_memory = tester.hook_memory_retrieve(layer_idx)
+        attn_layer._update_memory = tester.hook_memory_update(layer_idx, original_update)
+        attn_layer._retrieve_from_memory = tester.hook_memory_retrieve(layer_idx, original_retrieve)
     
     try:
         # Create test case
