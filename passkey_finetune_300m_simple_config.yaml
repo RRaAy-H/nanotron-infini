@@ -130,10 +130,4 @@ logging:
 # Profiler (disabled)
 profiler: null
 
-# Validation Configuration for Passkey Monitoring
-validation:
-  # Monitor passkey retrieval performance during training
-  passkey_eval_interval: 100  # Evaluate every 100 steps
-  passkey_eval_samples: 5    # Quick validation samples
-  memory_health_check: true   # Monitor balance factors and memory usage
 
