@@ -102,14 +102,14 @@ data_stages:
         hf_dataset_config_name: null
         hf_dataset_splits: "train"
         text_column_name: "prompt"
-        dataset_processing_num_proc_per_process: 16
+        dataset_processing_num_proc_per_process: 48
         dataset_overwrite_cache: false
         data_files: 
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00000-of-00004.parquet"
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00001-of-00004.parquet"
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00002-of-00004.parquet"
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00003-of-00004.parquet"
-      num_loading_workers: 8
+      num_loading_workers: 20
       seed: 42
 
 # Checkpoints Configuration
