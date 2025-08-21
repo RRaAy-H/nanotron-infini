@@ -248,11 +248,7 @@ def test_passkey_phases(model, tokenizer, parallel_context, checkpoint_path):
     hooks = setup_phase_monitoring(model, monitor)
     
     try:
-        # Tokenize input
-        inputs = tokenizer(full_text, return_tensors="pt", padding=True, truncation=False)
-        input_ids = inputs["input_ids"]
-        
-        print(f"Actual input tokens: {input_ids.shape[-1]}")
+        print(f"Context character length: {len(full_text)}")
         
         # Phase 1: Context Encoding
         print("\n" + "="*60)
@@ -262,19 +258,20 @@ def test_passkey_phases(model, tokenizer, parallel_context, checkpoint_path):
         
         # Generate with memory monitoring
         print("Starting generation...")
-        generation_config = {
-            "max_new_tokens": 50,
-            "temperature": 0.1,
-            "top_p": 0.9,
-            "do_sample": False
-        }
+        
+        # Import required classes
+        from nanotron.generation.decode import GenerationInput, GenerationArgs, TokenizerConfig
         
         # This will trigger both encoding and generation phases
         outputs = list(decode_text(
+            input_iter=[GenerationInput(text=full_text)],
+            tokenizer=tokenizer,
             model=model.model,
-            input_ids=input_ids,
-            input_mask=torch.ones_like(input_ids),
-            **generation_config
+            parallel_context=parallel_context,
+            max_new_tokens=50,
+            max_micro_batch_size=1,
+            generation_config=GenerationArgs(sampler="greedy", use_cache=False),
+            tokenizer_config=TokenizerConfig(max_input_length=len(full_text) + 100),
         ))
         
         # Phase 2: Answer Generation (automatic during decode_text)
@@ -342,7 +339,6 @@ def test_passkey_phases(model, tokenizer, parallel_context, checkpoint_path):
             'answer': answer,
             'correct': passkey in answer,
             'context_length': len(full_text),
-            'token_count': input_ids.shape[-1],
             'encoding_stats': dict(monitor.encoding_stats),
             'generation_stats': dict(monitor.generation_stats),
             'encoding_operations': encoding_ops,
