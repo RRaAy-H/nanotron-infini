@@ -2,8 +2,8 @@ general:
   benchmark_csv_path: null
   consumed_train_samples: null
   ignore_sanity_checks: true
-  project: llama_300m_passkey_finetune
-  run: 300m_passkey_10k_finetune_simple
+  project: llama_300m_passkey_finetune_optimized
+  run: 300m_passkey_optimized_memory_retrieval
   seed: 42
   step: null
 
@@ -15,10 +15,11 @@ infini_attention:
   balance_act_type: hard_sigmoid
   balance_init_type: zeros
   logging: true
-  logging_interval: 50 
-  log_grad: false
-  log_segment_acts: false
+  logging_interval: 25
+  log_grad: true
+  log_segment_acts: true
   balance_factor_weight_decay: 0.0
+  memory_regularization: 0.001
 
 # Model Configuration
 model:
@@ -56,13 +57,13 @@ optimizer:
   torch_adam_is_fused: false
   clip_grad: 1.0
   learning_rate_scheduler:
-    learning_rate: 0.00002
-    lr_decay_starting_step: null
-    lr_decay_steps: null
+    learning_rate: 0.00005
+    lr_decay_starting_step: 15200
+    lr_decay_steps: 15200
     lr_decay_style: cosine
-    lr_warmup_steps: 50  
+    lr_warmup_steps: 100
     lr_warmup_style: linear
-    min_decay_lr: 0.000001
+    min_decay_lr: 0.000005
   weight_decay: 0.02
   zero_stage: 0
 
@@ -82,15 +83,15 @@ tokenizer:
   tokenizer_name_or_path: lvwerra/the-tokenizer-v1
   tokenizer_revision: null
 
-# Training Tokens Configuration - Optimized for 4x RTX 4090
+# Training Tokens Configuration -
 tokens:
-  batch_accumulation_per_replica: 2  # Reduced to prevent memory issues
+  batch_accumulation_per_replica: 4
   limit_test_batches: 0
-  limit_val_batches: 10
+  limit_val_batches: 20
   micro_batch_size: 1
-  sequence_length: 8192
-  train_steps: 30200
-  val_check_interval: 50
+  sequence_length: 4096
+  train_steps: 30400
+  val_check_interval: 25
 
 # Data Configuration - Use existing high-quality parquet files
 data_stages:
@@ -114,18 +115,25 @@ data_stages:
 
 # Checkpoints Configuration
 checkpoints:
-  checkpoint_interval: 50
-  checkpoints_path: ./checkpoints/passkey_finetune_300m_simple
+  checkpoint_interval: 25  # More frequent checkpoints for monitoring
+  checkpoints_path: ./checkpoints/passkey_finetune_300m_optimized
   checkpoints_path_is_shared_file_system: false
-  resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
+  resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000  # Pre-trained base model
   save_initial_state: false
 
 # Logging Configuration
 logging:
-  iteration_step_info_interval: 10
+  iteration_step_info_interval: 5
   log_level: info
   log_level_replica: info
 
 # Profiler (disabled)
 profiler: null
+
+# Validation Configuration for Passkey Monitoring
+validation:
+  # Monitor passkey retrieval performance during training
+  passkey_eval_interval: 100  # Evaluate every 100 steps
+  passkey_eval_samples: 5    # Quick validation samples
+  memory_health_check: true   # Monitor balance factors and memory usage
 
