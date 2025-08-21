@@ -151,13 +151,26 @@ class PasskeyMemoryTracer:
         # Check if this might be passkey-related retrieval
         passkey_relevance = self._assess_passkey_relevance(retrieved_memory, query_states)
         
+        # Handle normalization values that might be tensors or scalars
+        def safe_norm_extract(norm_tensor):
+            if norm_tensor is None:
+                return 0.0
+            try:
+                if norm_tensor.numel() == 1:
+                    return norm_tensor.item()
+                else:
+                    # If it's a tensor with multiple elements, take the mean
+                    return norm_tensor.mean().item()
+            except:
+                return 0.0
+        
         retrieval_info = {
             'timestamp': time.time(),
             'operation': 'retrieve',
             'layer': layer_idx,
             'token_position': self.current_token_position,
             'generation_phase': self.generation_phase,
-            'memory_norm': memory_norm.item() if memory_norm is not None else 0.0,
+            'memory_norm': safe_norm_extract(memory_norm),
             'memory_stats': memory_stats,
             'query_stats': query_stats,
             'passkey_relevance': passkey_relevance,
@@ -192,14 +205,27 @@ class PasskeyMemoryTracer:
         # Check if passkey information might be being stored
         passkey_storage = self._assess_passkey_storage(key_states, value_states, new_memory)
         
+        # Handle normalization values that might be tensors or scalars
+        def safe_norm_extract(norm_tensor):
+            if norm_tensor is None:
+                return 0.0
+            try:
+                if norm_tensor.numel() == 1:
+                    return norm_tensor.item()
+                else:
+                    # If it's a tensor with multiple elements, take the mean
+                    return norm_tensor.mean().item()
+            except:
+                return 0.0
+        
         update_info = {
             'timestamp': time.time(),
             'operation': 'update',
             'layer': layer_idx,
             'token_position': self.current_token_position,
             'generation_phase': self.generation_phase,
-            'prev_memory_norm': prev_norm.item() if prev_norm is not None else 0.0,
-            'new_memory_norm': new_norm.item() if new_norm is not None else 0.0,
+            'prev_memory_norm': safe_norm_extract(prev_norm),
+            'new_memory_norm': safe_norm_extract(new_norm),
             'memory_change': memory_change_stats,
             'new_memory_stats': new_memory_stats,
             'passkey_storage': passkey_storage,
