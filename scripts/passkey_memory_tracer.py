@@ -33,7 +33,7 @@ from nanotron.models import build_model
 from nanotron.parallel import ParallelContext
 from nanotron.parallel.pipeline_parallel.engine import OneForwardOneBackwardPipelineEngine
 from nanotron.parallel.tensor_parallel.enum import TensorParallelLinearMode
-from nanotron.random import set_random_seed
+from nanotron.random import RandomStates, get_current_random_state, get_synced_random_state, set_random_seed
 from nanotron.serialize import load_weights
 from nanotron.trainer import CONFIG_TO_MODEL_CLASS, mark_tied_parameters
 from transformers import AutoTokenizer
@@ -514,12 +514,23 @@ def load_model_and_tokenizer(checkpoint_path):
     
     print(f"Final model type: {model_type}")
     
+    # Setup random states for model building
+    if parallel_config.tp_mode is TensorParallelLinearMode.ALL_REDUCE:
+        random_states = RandomStates({
+            "tp_synced": get_synced_random_state(random_state=get_current_random_state(), pg=parallel_context.tp_pg)
+        })
+    else:
+        random_states = RandomStates({})
+    
     model = build_model(
-        model_config=model_config,
-        parallel_context=parallel_context,
+        model_builder=lambda: CONFIG_TO_MODEL_CLASS[model_type](
+            config=model_config,
+            parallel_context=parallel_context,
+            parallel_config=parallel_config,
+            random_states=random_states,
+        ),
         dtype=torch.bfloat16,
-        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        model_class=CONFIG_TO_MODEL_CLASS[model_type]
+        parallel_context=parallel_context,
     )
     
     mark_tied_parameters(model=model, parallel_context=parallel_context, tied_groups=model_config.tied_groups)
