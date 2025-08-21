@@ -273,11 +273,23 @@ class PasskeyMemoryTracer:
         query_complexity = query_states.std().item() / (query_states.mean().abs().item() + 1e-8)
         
         # High similarity between query and memory might indicate relevant retrieval
-        similarity = F.cosine_similarity(
-            retrieved_memory.flatten(),
-            query_states.flatten(),
-            dim=0
-        ).item()
+        try:
+            memory_flat = retrieved_memory.flatten()
+            query_flat = query_states.flatten()
+            
+            if memory_flat.shape == query_flat.shape:
+                similarity = F.cosine_similarity(memory_flat, query_flat, dim=0).item()
+            else:
+                # Handle shape mismatch by using mean similarity across smaller tensor
+                min_size = min(memory_flat.shape[0], query_flat.shape[0])
+                similarity = F.cosine_similarity(
+                    memory_flat[:min_size], 
+                    query_flat[:min_size], 
+                    dim=0
+                ).item()
+        except Exception as e:
+            # Fallback if similarity computation fails
+            similarity = 0.0
         
         # Heuristic: relevant passkey info often has specific complexity patterns
         potential_passkey_info = min(1.0, (abs(similarity) + memory_complexity / 10) / 2)
@@ -305,11 +317,24 @@ class PasskeyMemoryTracer:
         value_complexity = value_states.std().item() / (value_states.mean().abs().item() + 1e-8)
         
         # High key-memory similarity might indicate specific information storage
-        key_memory_sim = F.cosine_similarity(
-            key_states.flatten(),
-            new_memory.flatten(),
-            dim=0
-        ).item()
+        try:
+            # Check if tensors can be compared
+            key_flat = key_states.flatten()
+            memory_flat = new_memory.flatten()
+            
+            if key_flat.shape == memory_flat.shape:
+                key_memory_sim = F.cosine_similarity(key_flat, memory_flat, dim=0).item()
+            else:
+                # Handle shape mismatch by using mean similarity across smaller tensor
+                min_size = min(key_flat.shape[0], memory_flat.shape[0])
+                key_memory_sim = F.cosine_similarity(
+                    key_flat[:min_size], 
+                    memory_flat[:min_size], 
+                    dim=0
+                ).item()
+        except Exception as e:
+            # Fallback if similarity computation fails
+            key_memory_sim = 0.0
         
         # Heuristic assessment
         base_score = (key_complexity + value_complexity) / 20
