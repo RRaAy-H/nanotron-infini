@@ -116,6 +116,10 @@ def load_model_and_tokenizer(checkpoint_path):
     config_path = Path(checkpoint_path) / "config.yaml"
     config = get_config_from_file(str(config_path))
     
+    # CRITICAL: Set constants.CONFIG before building model
+    from nanotron import constants
+    constants.CONFIG = config
+    
     # Setup parallelism for single GPU
     parallel_config = config.parallelism
     parallel_config.dp = 1
@@ -138,7 +142,6 @@ def load_model_and_tokenizer(checkpoint_path):
     
     # Build model
     from nanotron.models import build_model
-    from nanotron import constants
     from nanotron.models.llama import LlamaConfig
     
     model = build_model(
