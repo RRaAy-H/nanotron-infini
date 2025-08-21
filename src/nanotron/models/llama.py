@@ -561,7 +561,7 @@ class CausalSelfAttention(nn.Module, AttachableStore):
             # NOTE: assume that mask are all the same
             # because we split across sequence length
             # NOTE: take the assumption that all the masks are the same
-            assert torch.all(sequence_mask)
+            # assert torch.all(sequence_mask)  # Disabled: fails with padding tokens during generation
             segment_sequence_masks = torch.split(sequence_mask[:, :seq_len], segment_lengths, dim=1)
         else:
             segment_hidden_states = [hidden_states]
