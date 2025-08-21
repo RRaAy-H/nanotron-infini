@@ -82,7 +82,7 @@ def test_pipeline_hooks():
     call_counts = {'block_calls': 0, 'retrieve': 0, 'update': 0}
     
     # Hook every decoder pipeline block
-    for layer_idx, pipeline_block in enumerate(model.decoder):
+    for layer_idx, pipeline_block in enumerate(model.model.decoder):
         print(f"   Hooking pipeline block {layer_idx}: {type(pipeline_block)}")
         
         # Hook the pipeline block's forward method
@@ -130,7 +130,7 @@ def test_pipeline_hooks():
         # Replace the pipeline block's forward method
         pipeline_block.forward = create_block_forward_hook(layer_idx)
     
-    print(f"✅ Hooked {len(model.decoder)} pipeline blocks")
+    print(f"✅ Hooked {len(model.model.decoder)} pipeline blocks")
     
     # Test with decode_text
     print("\n🚀 Testing decode_text with pipeline block hooks...")
@@ -170,3 +170,4 @@ def test_pipeline_hooks():
 
 if __name__ == "__main__":
     test_pipeline_hooks()
+
