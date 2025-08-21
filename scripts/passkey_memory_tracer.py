@@ -538,11 +538,18 @@ def load_model_and_tokenizer(checkpoint_path):
     if tied_groups is not None:
         mark_tied_parameters(model=model, parallel_context=parallel_context, tied_groups=tied_groups)
     
-    # Load checkpoint
+    # Load checkpoint (may fail due to balance factor parameters)
     print(f"Loading checkpoint from {checkpoint_path}")
-    load_weights(model=model, parallel_context=parallel_context, root_folder=checkpoint_path)
+    try:
+        load_weights(model=model, parallel_context=parallel_context, root_folder=checkpoint_path)
+        print("Standard weight loading completed")
+    except NotImplementedError as e:
+        if "should be a NanotronParameter" in str(e):
+            print("Expected balance factor loading error - will fix with standalone loader")
+        else:
+            raise e
     
-    # Apply balance factor fix
+    # Apply balance factor fix (this handles both regular params and balance factors)
     print("Applying balance factor fix...")
     current_dir = os.path.dirname(os.path.abspath(__file__))
     base_path = os.path.abspath(os.path.join(current_dir, '..'))
