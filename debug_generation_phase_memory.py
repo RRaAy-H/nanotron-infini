@@ -163,7 +163,7 @@ def load_model_and_tokenizer(checkpoint_path):
     
     # Load weights
     try:
-        load_weights(model=model, parallel_context=parallel_context, root_folder=checkpoint_path)
+        load_weights(model=model, parallel_context=parallel_context, root_folder=Path(checkpoint_path))
     except NotImplementedError as e:
         if "should be a NanotronParameter" in str(e):
             print("Expected balance factor loading error - will fix with standalone loader")
