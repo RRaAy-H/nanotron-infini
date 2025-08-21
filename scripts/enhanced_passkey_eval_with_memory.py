@@ -291,6 +291,16 @@ def main():
     
     # Build model
     model_config_cls = model_config.__class__.__name__
+    
+    # Handle different possible model type names
+    if model_config_cls not in CONFIG_TO_MODEL_CLASS:
+        if "llama" in model_config_cls.lower():
+            model_config_cls = "LlamaConfig"
+        else:
+            # Default fallback - try the first available model class
+            model_config_cls = list(CONFIG_TO_MODEL_CLASS.keys())[0]
+            print(f"Warning: Unknown model config class, using {model_config_cls}")
+    
     if parallel_config.tp_mode is TensorParallelLinearMode.ALL_REDUCE:
         random_states = RandomStates({
             "tp_synced": get_synced_random_state(random_state=get_current_random_state(), pg=parallel_context.tp_pg)

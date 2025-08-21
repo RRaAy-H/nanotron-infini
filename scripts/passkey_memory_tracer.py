@@ -481,12 +481,29 @@ def load_model_and_tokenizer(checkpoint_path):
     model_config = config.model.model_config
     model_config.turn_on_memory = True  # Ensure memory is enabled
     
+    # Get the correct model class from config
+    model_type = config.model.model_config.model_type if hasattr(config.model.model_config, 'model_type') else config.model.init_method.split(".")[-1].lower()
+    
+    # Handle different possible model type names
+    if model_type not in CONFIG_TO_MODEL_CLASS:
+        if "llama" in str(model_type).lower():
+            model_type = "llama"
+        elif hasattr(config.model.model_config, '__class__'):
+            # Try to get model type from class name
+            class_name = config.model.model_config.__class__.__name__.lower()
+            if "llama" in class_name:
+                model_type = "llama"
+            else:
+                # Default fallback - try the first available model class
+                model_type = list(CONFIG_TO_MODEL_CLASS.keys())[0]
+                print(f"Warning: Unknown model type, using {model_type}")
+    
     model = build_model(
         model_config=model_config,
         parallel_context=parallel_context,
         dtype=torch.bfloat16,
         device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-        model_class=CONFIG_TO_MODEL_CLASS["llama"]
+        model_class=CONFIG_TO_MODEL_CLASS[model_type]
     )
     
     mark_tied_parameters(model=model, parallel_context=parallel_context, tied_groups=model_config.tied_groups)
