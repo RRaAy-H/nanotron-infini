@@ -710,8 +710,33 @@ def main():
     if outputs:
         output = outputs[0]
         if hasattr(output, 'generation_ids') and hasattr(output, 'input_ids'):
-            answer_ids = output.generation_ids[0][len(output.input_ids[0]):]
-            answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+            try:
+                # Handle different tensor structures
+                generation_ids = output.generation_ids
+                input_ids = output.input_ids
+                
+                # Ensure we have proper tensor dimensions
+                if generation_ids.dim() == 0:  # 0-d tensor
+                    generation_ids = generation_ids.unsqueeze(0).unsqueeze(0)
+                elif generation_ids.dim() == 1:  # 1-d tensor
+                    generation_ids = generation_ids.unsqueeze(0)
+                    
+                if input_ids.dim() == 0:  # 0-d tensor
+                    input_ids = input_ids.unsqueeze(0).unsqueeze(0)
+                elif input_ids.dim() == 1:  # 1-d tensor
+                    input_ids = input_ids.unsqueeze(0)
+                
+                # Extract answer tokens (generated tokens after input)
+                input_len = input_ids.shape[-1]
+                if generation_ids.shape[-1] > input_len:
+                    answer_ids = generation_ids[0][input_len:]
+                    answer = tokenizer.decode(answer_ids, skip_special_tokens=True).strip()
+                else:
+                    answer = tokenizer.decode(generation_ids[0], skip_special_tokens=True).strip()
+                    
+            except Exception as e:
+                print(f"Error extracting answer: {e}")
+                answer = str(output)
         else:
             answer = str(output)
     else:
