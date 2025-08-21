@@ -533,7 +533,10 @@ def load_model_and_tokenizer(checkpoint_path):
         parallel_context=parallel_context,
     )
     
-    mark_tied_parameters(model=model, parallel_context=parallel_context, tied_groups=model_config.tied_groups)
+    # Mark tied parameters if they exist in the config
+    tied_groups = getattr(model_config, 'tied_groups', None)
+    if tied_groups is not None:
+        mark_tied_parameters(model=model, parallel_context=parallel_context, tied_groups=tied_groups)
     
     # Load checkpoint
     print(f"Loading checkpoint from {checkpoint_path}")
