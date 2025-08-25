@@ -124,6 +124,8 @@ checkpoints:
   checkpoints_path_is_shared_file_system: false
   resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
   save_initial_state: false
+  # Skip optimizer loading for fine-tuning (restart optimizer state)
+  load_optimizer_states: false
 
 # Logging Configuration
 logging:
