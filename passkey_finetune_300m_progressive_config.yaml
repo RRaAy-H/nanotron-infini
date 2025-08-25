@@ -2,16 +2,16 @@ general:
   benchmark_csv_path: null
   consumed_train_samples: null
   ignore_sanity_checks: true
-  project: llama_300m_passkey_finetune_progressive
-  run: 300m_passkey_progressive_memory_training
+  project: llama_300m_passkey_finetune_mixed
+  run: 300m_passkey_mixed_dataset_training
   seed: 42
   step: null
 
-# Infini-Attention Configuration - Progressive Segment Length
+# Infini-Attention Configuration - Memory Forcing
 infini_attention:
   segment_length: 64
   turn_on_memory: true
-  balance_factor_lr: 0.01
+  balance_factor_lr: 0.002
   balance_act_type: hard_sigmoid
   balance_init_type: zeros
   logging: true
@@ -88,14 +88,13 @@ tokens:
   limit_test_batches: 0
   limit_val_batches: 20
   micro_batch_size: 1
-  sequence_length: 2048
+  sequence_length: 2304
   train_steps: 4000
   val_check_interval: 100
 
-# Progressive Data Stages Configuration
+# Data Configuration - Mixed Dataset
 data_stages:
-  # Stage 1: Memory Activation
-  - name: "Memory Activation Phase"
+  - name: "Mixed Passkey and PG19 Training"
     start_training_step: 1
     data:
       dataset:
@@ -106,130 +105,22 @@ data_stages:
         dataset_processing_num_proc_per_process: 48
         dataset_overwrite_cache: false
         data_files:
-          # Mixed dataset: 40% Passkey + 60% PG19
+          # Mixed dataset: Passkey + PG19 (balanced approach)
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00000-of-00004.parquet"
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00001-of-00004.parquet"
+          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00002-of-00004.parquet"
+          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00003-of-00004.parquet"
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00000-of-00023.parquet"
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00001-of-00023.parquet"
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00002-of-00023.parquet"
-      num_loading_workers: 20
-      seed: 42
-    infini_attention:
-      segment_length: 64
-    tokens:
-      sequence_length: 2048
-
-  # Stage 2: Memory Training
-  - name: "Memory Training Phase"
-    start_training_step: 800
-    data:
-      dataset:
-        hf_dataset_or_datasets: "parquet"
-        hf_dataset_config_name: null
-        hf_dataset_splits: "train"
-        text_column_name: "prompt"
-        dataset_processing_num_proc_per_process: 48
-        dataset_overwrite_cache: false
-        data_files:
-          # Mixed dataset: 50% Passkey + 50% PG19
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00000-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00001-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00002-of-00004.parquet"
           - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00003-of-00023.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00004-of-00023.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00005-of-00023.parquet"
       num_loading_workers: 20
       seed: 42
-    # Override for this stage
-    infini_attention:
-      segment_length: 128
-    tokens:
-      sequence_length: 4096
-
-  # Stage 3: Memory Expansion
-  - name: "Memory Expansion Phase"
-    start_training_step: 1600
-    data:
-      dataset:
-        hf_dataset_or_datasets: "parquet"
-        hf_dataset_config_name: null
-        hf_dataset_splits: "train"
-        text_column_name: "prompt"
-        dataset_processing_num_proc_per_process: 48
-        dataset_overwrite_cache: false
-        data_files:
-          # Mixed dataset: 60% Passkey + 40% PG19
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00000-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00001-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00002-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00003-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00006-of-00023.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00007-of-00023.parquet"
-      num_loading_workers: 20
-      seed: 42
-    # Override for this stage
-    infini_attention:
-      segment_length: 256
-    tokens:
-      sequence_length: 6144
-
-  # Stage 4: Performance Optimization
-  - name: "Performance Optimization Phase"
-    start_training_step: 2400
-    data:
-      dataset:
-        hf_dataset_or_datasets: "parquet"
-        hf_dataset_config_name: null
-        hf_dataset_splits: "train"
-        text_column_name: "prompt"
-        dataset_processing_num_proc_per_process: 48
-        dataset_overwrite_cache: false
-        data_files:
-          # Mixed dataset: 70% Passkey + 30% PG19 (more task-focused)
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00000-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00001-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00002-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00003-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00008-of-00023.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00009-of-00023.parquet"
-      num_loading_workers: 20
-      seed: 42
-    # Override for this stage
-    infini_attention:
-      segment_length: 512
-    tokens:
-      sequence_length: 8192
-
-  # Stage 5: Full Performance
-  - name: "Full Performance Phase"
-    start_training_step: 3200
-    data:
-      dataset:
-        hf_dataset_or_datasets: "parquet"
-        hf_dataset_config_name: null
-        hf_dataset_splits: "train"
-        text_column_name: "prompt"
-        dataset_processing_num_proc_per_process: 48
-        dataset_overwrite_cache: false
-        data_files:
-          # Mixed dataset: 80% Passkey + 20% PG19 (high task focus)
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00000-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00001-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00002-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/train-00003-of-00004.parquet"
-          - "/data1/infini-attn/infini-llama/nanotron-infini/finetuning/pg19/train-00010-of-00023.parquet"
-      num_loading_workers: 20
-      seed: 42
-    # Override for this stage
-    infini_attention:
-      segment_length: 1024
-    tokens:
-      sequence_length: 12288
 
 # Checkpoints Configuration
 checkpoints:
   checkpoint_interval: 500
-  checkpoints_path: ./checkpoints/passkey_finetune_300m_progressive
+  checkpoints_path: ./checkpoints/passkey_finetune_300m_mixed
   checkpoints_path_is_shared_file_system: false
   resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
   save_initial_state: false

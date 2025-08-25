@@ -66,7 +66,7 @@ export WANDB_DISABLED=true
 NUM_GPUS=4
 
 # Create checkpoint directory (matches progressive config)
-mkdir -p ./checkpoints/passkey_finetune_300m_progressive
+mkdir -p ./checkpoints/passkey_finetune_300m_mixed
 
 # Run training
 echo "Running progressive finetuning with $NUM_GPUS GPUs..."
@@ -88,12 +88,12 @@ if [ $? -eq 0 ]; then
     echo "PROGRESSIVE PASSKEY FINETUNING COMPLETED SUCCESSFULLY!"
     echo "=========================================================="
     echo ""
-    echo "Checkpoints saved to: ./checkpoints/passkey_finetune_300m_progressive/"
+    echo "Checkpoints saved to: ./checkpoints/passkey_finetune_300m_mixed/"
     echo ""
     
     # Show checkpoint directory contents
     echo "Available checkpoints:"
-    ls -la ./checkpoints/passkey_finetune_300m_progressive/ 2>/dev/null || echo "Check the checkpoint directory"
+    ls -la ./checkpoints/passkey_finetune_300m_mixed/ 2>/dev/null || echo "Check the checkpoint directory"
     
 else
     echo ""
