@@ -60,7 +60,7 @@ optimizer:
     lr_decay_starting_step: 3200
     lr_decay_steps: 800
     lr_decay_style: cosine
-    lr_warmup_steps: 50
+    lr_warmup_steps: 500
     lr_warmup_style: linear
     min_decay_lr: 0.000001
   weight_decay: 0.02
@@ -89,7 +89,7 @@ tokens:
   limit_val_batches: 20
   micro_batch_size: 1
   sequence_length: 2304
-  train_steps: 4000
+  train_steps: 35000
   val_check_interval: 100
 
 # Data Configuration - Mixed Dataset
@@ -119,7 +119,7 @@ data_stages:
 
 # Checkpoints Configuration
 checkpoints:
-  checkpoint_interval: 500
+  checkpoint_interval: 1000
   checkpoints_path: ./checkpoints/passkey_finetune_300m_mixed
   checkpoints_path_is_shared_file_system: false
   resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
