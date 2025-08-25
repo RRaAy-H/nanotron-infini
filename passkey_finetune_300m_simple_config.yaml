@@ -9,9 +9,9 @@ general:
 
 # Infini-Attention Configuration
 infini_attention:
-  segment_length: 1024
+  segment_length: 64
   turn_on_memory: true
-  balance_factor_lr: 0.01
+  balance_factor_lr: 0.002
   balance_act_type: hard_sigmoid
   balance_init_type: zeros
   logging: true
@@ -22,7 +22,7 @@ infini_attention:
 
 # Model Configuration
 model:
-  ddp_bucket_cap_mb: 5  # Further reduced for memory optimization
+  ddp_bucket_cap_mb: 5  # reduced for memory optimization
   dtype: bfloat16
   init_method:
     std: 0.03125  # 1/sqrt(1024)
@@ -89,8 +89,8 @@ tokens:
   limit_val_batches: 20
   micro_batch_size: 1
   sequence_length: 4096
-  train_steps: 30400
-  val_check_interval: 25
+  train_steps: 35000
+  val_check_interval: 100
 
 # Data Configuration - Use existing high-quality parquet files
 data_stages:
@@ -114,15 +114,15 @@ data_stages:
 
 # Checkpoints Configuration
 checkpoints:
-  checkpoint_interval: 25  # More frequent checkpoints for monitoring
+  checkpoint_interval: 500
   checkpoints_path: ./checkpoints/passkey_finetune_300m_optimized
   checkpoints_path_is_shared_file_system: false
-  resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000  # Pre-trained base model
+  resume_checkpoint_path: ./checkpoints/fineweb_4gpu_300m_infini/30000
   save_initial_state: false
 
 # Logging Configuration
 logging:
-  iteration_step_info_interval: 5
+  iteration_step_info_interval: 20
   log_level: info
   log_level_replica: info
 
