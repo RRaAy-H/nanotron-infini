@@ -16,7 +16,7 @@ infini_attention:
   balance_init_type: zeros
   logging: true
   logging_interval: 100
-  log_grad: true
+  log_grad: false
   log_segment_acts: true
   balance_factor_weight_decay: 0.0
 
@@ -64,6 +64,7 @@ optimizer:
     lr_warmup_style: linear
     min_decay_lr: 0.000003
   weight_decay: 0.1
+  zero_stage: 0
 
 # Parallelism Configuration
 parallelism:
@@ -88,7 +89,7 @@ tokens:
   limit_val_batches: 20
   micro_batch_size: 2
   sequence_length: 4096
-  train_steps: 500
+  train_steps: 30500
   val_check_interval: 100
 
 # Data Configuration
