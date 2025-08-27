@@ -62,10 +62,9 @@ def get_args():
     parser.add_argument("--pp", type=int, default=0)
     parser.add_argument("--tp", type=int, default=0)
     parser.add_argument("--max-new-tokens", type=int, default=15, help="Maximum number of new tokens to generate")
-    parser.add_argument("--save_path", type=str, required=True)
     parser.add_argument("--eval_dataset_path", type=str, required=True)
-    parser.add_argument("--num_shots", type=int, required=True)
-    parser.add_argument("--num_digits", type=int, default=0)
+    parser.add_argument("--num_shots", type=int, default=0, help="Number of shots (only used if dataset has num_shots field)")
+    parser.add_argument("--num_digits", type=int, default=0, help="Number of digits (only used if dataset has num_digits field)")
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--num_samples", type=int, required=True)
     return parser.parse_args()
@@ -153,8 +152,12 @@ def load_and_filter_dataset(eval_dataset_path, depth_percent, num_shots, num_dig
         dataset = load_dataset(eval_dataset_path, split="train")
 
     # Filter the dataset
-    filtered_dataset = dataset.filter(lambda x: x["depth_percent"] == depth_percent and x["num_shots"] == num_shots)
-    if num_digits > 0:
+    filtered_dataset = dataset.filter(lambda x: x["depth_percent"] == depth_percent)
+    
+    # Only filter by num_shots and num_digits if these fields exist in the dataset
+    if "num_shots" in dataset.column_names:
+        filtered_dataset = filtered_dataset.filter(lambda x: x["num_shots"] == num_shots)
+    if "num_digits" in dataset.column_names and num_digits > 0:
         filtered_dataset = filtered_dataset.filter(lambda x: x["num_digits"] == num_digits)
 
     # filtered_dataset = dataset.filter(
@@ -175,7 +178,6 @@ def load_and_filter_dataset(eval_dataset_path, depth_percent, num_shots, num_dig
 def main():
     args = get_args()
     # depth_percent = args.depth_percent
-    save_path = args.save_path
     eval_dataset_path = args.eval_dataset_path
     num_shots = args.num_shots
     num_digits = args.num_digits
@@ -377,15 +379,6 @@ def main():
             responses = [x for sublist in responses for x in sublist]
             answer_idxs = [x for sublist in answer_idxs for x in sublist]
 
-            # Only save results on rank 0 to avoid distributed training issues
-            # For single GPU or when using data parallel, only rank 0 saves
-            if dist.get_rank(parallel_context.dp_pg) == 0 and dist.get_rank(parallel_context.tp_pg) == 0 and dist.get_rank(parallel_context.pp_pg) == 0:
-                df["generation_text"] = responses
-                df["generation_ids"] = answer_idxs
-
-                df.to_pickle(
-                    f"{save_path}/passkey_eval_results_for_{depth_percent}_depth_and_num_shots_{num_shots}_and_num_samples_{num_samples}_and_num_digits_{num_digits}_and_seed_{seed}.pkl"
-                )
 
 
 if __name__ == "__main__":
