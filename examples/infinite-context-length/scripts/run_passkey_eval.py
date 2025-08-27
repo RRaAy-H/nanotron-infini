@@ -384,20 +384,26 @@ def main():
             responses = [x for sublist in responses for x in sublist]
             answer_idxs = [x for sublist in answer_idxs for x in sublist]
             
-            # Calculate accuracy for this depth
+            # Calculate accuracy for this depth - USING SAME METHOD AS NEEDLE-IN-HAYSTACK
             correct = 0
             total = len(responses)
             target_answers = df['answer'].tolist()
             
             for i, (response, target) in enumerate(zip(responses, target_answers)):
-                try:
-                    # Try to extract number from response
-                    predicted_number = int(''.join(filter(str.isdigit, response.strip())))
-                    if predicted_number == target:
-                        correct += 1
-                except (ValueError, AttributeError):
-                    # If can't parse response, count as incorrect
-                    pass
+                # Use substring matching like needle-in-haystack evaluation
+                if str(target) in response:
+                    correct += 1
+                    
+            # COMMENTED OUT: Original exact number extraction method
+            # for i, (response, target) in enumerate(zip(responses, target_answers)):
+            #     try:
+            #         # Try to extract number from response
+            #         predicted_number = int(''.join(filter(str.isdigit, response.strip())))
+            #         if predicted_number == target:
+            #             correct += 1
+            #     except (ValueError, AttributeError):
+            #         # If can't parse response, count as incorrect
+            #         pass
             
             accuracy = correct / total if total > 0 else 0.0
             
@@ -414,7 +420,7 @@ def main():
                 "accuracy": accuracy,
                 "correct": correct,
                 "total": total,
-                "samples": [{"response": r, "target": t, "correct": int(''.join(filter(str.isdigit, r.strip()))) == t if r.strip().isdigit() or any(c.isdigit() for c in r) else False} 
+                "samples": [{"response": r, "target": t, "correct": str(t) in r} 
                            for r, t in zip(responses, target_answers)]
             })
 
