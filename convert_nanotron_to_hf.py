@@ -236,7 +236,6 @@ def main():
         print("You may need to manually copy the tokenizer files")
     
     print(f"Conversion complete! HuggingFace model saved to {output_path}")
-    print(f"You can now use: lm_eval --model hf --model_args pretrained={output_path} --tasks arc_easy")
 
 if __name__ == "__main__":
     main()
