@@ -120,10 +120,14 @@ def verify_conversion():
         nanotron_tokens = load_file(nanotron_token_path)["data"]
         hf_tokens = weights["model.embed_tokens.weight"]
         
-        if torch.allclose(nanotron_tokens, hf_tokens, rtol=1e-6):
-            print("✓ Token embeddings match between Nanotron and HF")
+        # Check with appropriate tolerance for bfloat16
+        if torch.allclose(nanotron_tokens, hf_tokens, rtol=1e-3, atol=1e-4):
+            diff = torch.abs(nanotron_tokens - hf_tokens)
+            max_diff = torch.max(diff).item()
+            mean_diff = torch.mean(diff).item()
+            print(f"✓ Token embeddings match within tolerance (max diff: {max_diff:.6f}, mean diff: {mean_diff:.6f})")
         else:
-            print("✗ Token embeddings don't match!")
+            print("✗ Token embeddings have significant differences!")
             return False
     
     print("\n=== CONVERSION VERIFICATION COMPLETE ===")
