@@ -9,7 +9,7 @@ import json
 import torch
 from pathlib import Path
 from safetensors.torch import save_file
-from transformers import LlamaConfig, LlamaTokenizer
+from transformers import LlamaConfig, AutoTokenizer
 import yaml
 
 def load_nanotron_checkpoint(checkpoint_path: Path):
@@ -175,8 +175,9 @@ def main():
     # Copy tokenizer
     print("Setting up tokenizer...")
     try:
-        tokenizer = LlamaTokenizer.from_pretrained(args.tokenizer)
+        tokenizer = AutoTokenizer.from_pretrained(args.tokenizer)
         tokenizer.save_pretrained(output_path)
+        print(f"Successfully saved tokenizer: {tokenizer.__class__.__name__}")
     except Exception as e:
         print(f"Warning: Could not load tokenizer {args.tokenizer}: {e}")
         print("You may need to manually copy the tokenizer files")
