@@ -67,6 +67,7 @@ def get_args():
     parser.add_argument("--num_digits", type=int, default=0, help="Number of digits (only used if dataset has num_digits field)")
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--num_samples", type=int, required=True)
+    parser.add_argument("--results_file", type=str, help="Optional JSON file to save final results summary")
     return parser.parse_args()
 
 
@@ -183,6 +184,10 @@ def main():
     num_digits = args.num_digits
     seed = args.seed
     num_samples = args.num_samples
+    results_file = args.results_file
+    
+    # Collect results for final summary
+    all_results = []
 
     assert args.ckpt_path.exists(), f"Checkpoint path {args.ckpt_path} does not exist"
 
@@ -378,7 +383,85 @@ def main():
             # NOTE: now flatten the responses
             responses = [x for sublist in responses for x in sublist]
             answer_idxs = [x for sublist in answer_idxs for x in sublist]
+            
+            # Calculate accuracy for this depth
+            correct = 0
+            total = len(responses)
+            target_answers = df['answer'].tolist()
+            
+            for i, (response, target) in enumerate(zip(responses, target_answers)):
+                try:
+                    # Try to extract number from response
+                    predicted_number = int(''.join(filter(str.isdigit, response.strip())))
+                    if predicted_number == target:
+                        correct += 1
+                except (ValueError, AttributeError):
+                    # If can't parse response, count as incorrect
+                    pass
+            
+            accuracy = correct / total if total > 0 else 0.0
+            
+            log_rank(
+                f"Depth {depth_percent}%: {correct}/{total} correct ({accuracy:.2%})",
+                logger=logger,
+                level=logging.INFO,
+                rank=0,
+            )
+            
+            # Store results for final summary
+            all_results.append({
+                "depth_percent": depth_percent,
+                "accuracy": accuracy,
+                "correct": correct,
+                "total": total,
+                "samples": [{"response": r, "target": t, "correct": int(''.join(filter(str.isdigit, r.strip()))) == t if r.strip().isdigit() or any(c.isdigit() for c in r) else False} 
+                           for r, t in zip(responses, target_answers)]
+            })
 
+        # Save final results summary
+        if results_file and dist.get_rank(parallel_context.dp_pg) == 0 and dist.get_rank(parallel_context.tp_pg) == 0 and dist.get_rank(parallel_context.pp_pg) == 0:
+            import json
+            import os
+            from datetime import datetime
+            
+            # Calculate overall accuracy
+            total_correct = sum(r['correct'] for r in all_results)
+            total_samples = sum(r['total'] for r in all_results)
+            overall_accuracy = total_correct / total_samples if total_samples > 0 else 0.0
+            
+            summary = {
+                "evaluation_summary": {
+                    "timestamp": datetime.now().isoformat(),
+                    "checkpoint_path": str(args.ckpt_path),
+                    "dataset_path": eval_dataset_path,
+                    "num_samples": num_samples,
+                    "seed": seed,
+                    "overall_accuracy": overall_accuracy,
+                    "total_correct": total_correct,
+                    "total_samples": total_samples
+                },
+                "depth_results": all_results
+            }
+            
+            # Create directory if needed
+            os.makedirs(os.path.dirname(results_file), exist_ok=True)
+            
+            with open(results_file, 'w') as f:
+                json.dump(summary, f, indent=2)
+            
+            log_rank(
+                f"Results saved to: {results_file}",
+                logger=logger,
+                level=logging.INFO,
+                rank=0,
+            )
+            
+            log_rank(
+                f"Overall Accuracy: {overall_accuracy:.2%} ({total_correct}/{total_samples})",
+                logger=logger,
+                level=logging.INFO,
+                rank=0,
+            )
 
 
 if __name__ == "__main__":

@@ -7,6 +7,11 @@ CONTEXT_LENGTH="${2:-16384}"
 NUM_SAMPLES="${3:-20}" 
 GPU_DEVICE="${4:-6}"
 
+# Create results directory and file
+RESULTS_DIR="./results/passkey_300m_single_gpu_$(date +%Y%m%d_%H%M%S)"
+mkdir -p $RESULTS_DIR
+RESULTS_FILE="$RESULTS_DIR/passkey_eval_results.json"
+
 echo "=========================================================="
 echo "LOW-MEMORY PASSKEY EVALUATION - 300M INFINI-ATTENTION"
 echo "=========================================================="
@@ -14,6 +19,7 @@ echo "Checkpoint: $CHECKPOINT_PATH"
 echo "Context Length: $CONTEXT_LENGTH tokens"
 echo "Samples per depth: $NUM_SAMPLES"
 echo "GPU Device: $GPU_DEVICE"
+echo "Results: $RESULTS_FILE"
 echo "=========================================================="
 
 # Validate checkpoint
@@ -64,6 +70,7 @@ torchrun --nproc_per_node=1 \
     --seed 42 \
     --num_samples $NUM_SAMPLES \
     --max-new-tokens 15 \
+    --results_file $RESULTS_FILE \
     --dp 1 \
     --tp 1 \
     --pp 1
@@ -73,6 +80,26 @@ if [ $? -eq 0 ]; then
     echo "=========================================================="
     echo "LOW-MEMORY EVALUATION COMPLETED!"
     echo "=========================================================="
+    echo "Results saved to: $RESULTS_FILE"
+    
+    # Show summary if results file exists
+    if [ -f "$RESULTS_FILE" ]; then
+        echo ""
+        echo "Quick Summary:"
+        python3 -c "
+import json
+try:
+    with open('$RESULTS_FILE', 'r') as f:
+        data = json.load(f)
+    summary = data['evaluation_summary']
+    print(f\"Overall Accuracy: {summary['overall_accuracy']:.2%} ({summary['total_correct']}/{summary['total_samples']})\")
+    print(f\"Per depth:\")
+    for result in data['depth_results']:
+        print(f\"  {result['depth_percent']:3d}%: {result['accuracy']:.2%} ({result['correct']}/{result['total']})\")
+except Exception as e:
+    print(f'Could not parse results: {e}')
+"
+    fi
 else
     echo "ERROR: Evaluation failed"
     exit 1
