@@ -21,8 +21,8 @@ def load_nanotron_checkpoint(checkpoint_path: Path):
     token_emb_path = model_path / "token_position_embeddings" / "pp_block" / "token_embedding" / "model_weight_pp-rank-0-of-1_tp-rank-0-of-1.safetensors"
     if token_emb_path.exists():
         token_weights = load_file(token_emb_path)
-        weights.update(token_weights)
-        print(f"Loaded token embeddings: {list(token_weights.keys())}")
+        weights["token_embedding.weight"] = token_weights["data"]
+        print(f"Loaded token embeddings: {token_weights['data'].shape}")
     
     # Load decoder layers (0-11)
     for layer_idx in range(12):  # Assuming 12 layers based on config
@@ -32,61 +32,54 @@ def load_nanotron_checkpoint(checkpoint_path: Path):
         qkv_path = layer_path / "attn" / "qkv_proj" / "model_weight_pp-rank-0-of-1_tp-rank-0-of-1.safetensors"
         if qkv_path.exists():
             qkv_weights = load_file(qkv_path)
-            for key, tensor in qkv_weights.items():
-                weights[f"decoder.{layer_idx}.attn.qkv_proj.{key}"] = tensor
+            weights[f"decoder.{layer_idx}.attn.qkv_proj.weight"] = qkv_weights["data"]
         
         o_proj_path = layer_path / "attn" / "o_proj" / "model_weight_pp-rank-0-of-1_tp-rank-0-of-1.safetensors"
         if o_proj_path.exists():
             o_proj_weights = load_file(o_proj_path)
-            for key, tensor in o_proj_weights.items():
-                weights[f"decoder.{layer_idx}.attn.o_proj.{key}"] = tensor
+            weights[f"decoder.{layer_idx}.attn.o_proj.weight"] = o_proj_weights["data"]
         
         # Balance factors (Infini-specific)
         balance_path = layer_path / "attn" / "model_balance_factors_pp-rank-0-of-1_tp-rank-0-of-1.safetensors"
         if balance_path.exists():
             balance_weights = load_file(balance_path)
-            for key, tensor in balance_weights.items():
-                weights[f"decoder.{layer_idx}.attn.balance_factors.{key}"] = tensor
+            weights[f"decoder.{layer_idx}.attn.balance_factors.weight"] = balance_weights["data"]
         
         # MLP weights
         gate_up_path = layer_path / "mlp" / "gate_up_proj" / "model_weight_pp-rank-0-of-1_tp-rank-0-of-1.safetensors"
         if gate_up_path.exists():
             gate_up_weights = load_file(gate_up_path)
-            for key, tensor in gate_up_weights.items():
-                weights[f"decoder.{layer_idx}.mlp.gate_up_proj.{key}"] = tensor
+            weights[f"decoder.{layer_idx}.mlp.gate_up_proj.weight"] = gate_up_weights["data"]
         
         down_proj_path = layer_path / "mlp" / "down_proj" / "model_weight_pp-rank-0-of-1_tp-rank-0-of-1.safetensors"
         if down_proj_path.exists():
             down_proj_weights = load_file(down_proj_path)
-            for key, tensor in down_proj_weights.items():
-                weights[f"decoder.{layer_idx}.mlp.down_proj.{key}"] = tensor
+            weights[f"decoder.{layer_idx}.mlp.down_proj.weight"] = down_proj_weights["data"]
         
         # Layer norms
         input_ln_path = layer_path / "input_layernorm" / "model_weight.safetensors"
         if input_ln_path.exists():
             input_ln_weights = load_file(input_ln_path)
-            for key, tensor in input_ln_weights.items():
-                weights[f"decoder.{layer_idx}.input_layernorm.{key}"] = tensor
+            weights[f"decoder.{layer_idx}.input_layernorm.weight"] = input_ln_weights["data"]
         
         post_attn_ln_path = layer_path / "post_attention_layernorm" / "model_weight.safetensors"
         if post_attn_ln_path.exists():
             post_attn_ln_weights = load_file(post_attn_ln_path)
-            for key, tensor in post_attn_ln_weights.items():
-                weights[f"decoder.{layer_idx}.post_attention_layernorm.{key}"] = tensor
+            weights[f"decoder.{layer_idx}.post_attention_layernorm.weight"] = post_attn_ln_weights["data"]
     
     # Load final layer norm
     final_ln_path = model_path / "final_layer_norm" / "pp_block" / "model_weight.safetensors"
     if final_ln_path.exists():
         final_ln_weights = load_file(final_ln_path)
-        weights.update(final_ln_weights)
-        print(f"Loaded final layer norm: {list(final_ln_weights.keys())}")
+        weights["final_layer_norm.weight"] = final_ln_weights["data"]
+        print(f"Loaded final layer norm: {final_ln_weights['data'].shape}")
     
     # Load language model head
     lm_head_path = model_path / "lm_head" / "pp_block" / "model_weight_pp-rank-0-of-1_tp-rank-0-of-1.safetensors"
     if lm_head_path.exists():
         lm_head_weights = load_file(lm_head_path)
-        weights.update(lm_head_weights)
-        print(f"Loaded lm_head: {list(lm_head_weights.keys())}")
+        weights["lm_head.weight"] = lm_head_weights["data"]
+        print(f"Loaded lm_head: {lm_head_weights['data'].shape}")
     
     print(f"Total weights loaded: {len(weights)}")
     return weights
@@ -98,10 +91,9 @@ def convert_nanotron_to_hf_weights(nanotron_weights, config):
     print("Converting weights...")
     
     # Convert embeddings
-    for key in nanotron_weights:
-        if "token_embedding" in key and "weight" in key:
-            hf_weights["model.embed_tokens.weight"] = nanotron_weights[key]
-            print(f"Mapped {key} -> model.embed_tokens.weight")
+    if "token_embedding.weight" in nanotron_weights:
+        hf_weights["model.embed_tokens.weight"] = nanotron_weights["token_embedding.weight"]
+        print("Mapped token_embedding.weight -> model.embed_tokens.weight")
     
     # Convert decoder layers
     for i in range(config.num_hidden_layers):
@@ -157,16 +149,14 @@ def convert_nanotron_to_hf_weights(nanotron_weights, config):
             hf_weights[f"model.layers.{i}.post_attention_layernorm.weight"] = nanotron_weights[post_attn_ln_key]
     
     # Final layer norm
-    for key in nanotron_weights:
-        if "final_layer_norm" in key and "weight" in key:
-            hf_weights["model.norm.weight"] = nanotron_weights[key]
-            print(f"Mapped {key} -> model.norm.weight")
+    if "final_layer_norm.weight" in nanotron_weights:
+        hf_weights["model.norm.weight"] = nanotron_weights["final_layer_norm.weight"]
+        print("Mapped final_layer_norm.weight -> model.norm.weight")
     
     # Language model head
-    for key in nanotron_weights:
-        if "lm_head" in key and "weight" in key and "balance" not in key:
-            hf_weights["lm_head.weight"] = nanotron_weights[key]
-            print(f"Mapped {key} -> lm_head.weight")
+    if "lm_head.weight" in nanotron_weights:
+        hf_weights["lm_head.weight"] = nanotron_weights["lm_head.weight"]
+        print("Mapped lm_head.weight -> lm_head.weight")
     
     print(f"HF weights created: {len(hf_weights)}")
     return hf_weights
