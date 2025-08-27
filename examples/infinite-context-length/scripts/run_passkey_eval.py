@@ -313,7 +313,7 @@ def main():
         tokenizer.padding_side = "left"
         tokenizer.truncation_side = "left"  # TODO @nouamane: do we want this?
 
-        for depth_percent in [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100]:
+        for depth_percent in [0, 25, 50, 75, 100]:
             log_rank(
                 f"depth_percent: {depth_percent}",
                 logger=logger,
