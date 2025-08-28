@@ -258,7 +258,8 @@ class BalanceFactorAnalyzer:
         # 4. Static matplotlib plots for papers/presentations
         self._create_publication_plots()
         viz_files.extend([
-            str(self.output_dir / "distribution_static.png"),
+            str(self.output_dir / "balance_factor_distribution.png"),
+            str(self.output_dir / "memory_attention_preference.png"),
             str(self.output_dir / "heatmap_static.png"),
             str(self.output_dir / "layer_stats_static.png")
         ])
@@ -427,27 +428,34 @@ class BalanceFactorAnalyzer:
         # Set style
         plt.style.use('seaborn-v0_8')
         
-        # 1. Distribution plot
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-        
         flat_weights = self.global_weights.flatten()
-        ax1.hist(flat_weights, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
-        ax1.set_xlabel('Balance Factor Value')
-        ax1.set_ylabel('Frequency')
-        ax1.set_title('Balance Factor Distribution')
-        ax1.axvline(0.5, color='red', linestyle='--', alpha=0.7, label='Memory/Attention Threshold')
-        ax1.legend()
         
-        # Pie chart
-        memory_count = (flat_weights >= 0.5).sum()
-        attention_count = (flat_weights < 0.5).sum()
-        ax2.pie([memory_count, attention_count], 
-               labels=['Memory Preference', 'Attention Preference'],
-               autopct='%1.1f%%', colors=['lightcoral', 'lightblue'])
-        ax2.set_title('Memory vs Attention Preference')
+        # 1. Distribution histogram (separate PNG)
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        ax.hist(flat_weights, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
+        ax.set_xlabel('Balance Factor Value')
+        ax.set_ylabel('Frequency')
+        ax.set_title('Balance Factor Distribution')
+        ax.axvline(0.5, color='red', linestyle='--', alpha=0.7, label='Memory/Attention Threshold')
+        ax.legend()
+        ax.grid(True, alpha=0.3)
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / "distribution_static.png", dpi=300, bbox_inches='tight')
+        plt.savefig(self.output_dir / "balance_factor_distribution.png", dpi=300, bbox_inches='tight')
+        plt.close()
+        
+        # 2. Memory vs Attention Preference pie chart (separate PNG)
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        memory_count = (flat_weights >= 0.5).sum()
+        attention_count = (flat_weights < 0.5).sum()
+        ax.pie([memory_count, attention_count], 
+               labels=['Memory Preference (≥0.5)', 'Attention Preference (<0.5)'],
+               autopct='%1.1f%%', colors=['lightcoral', 'lightblue'],
+               startangle=90, textprops={'fontsize': 12})
+        ax.set_title('Memory vs Attention Preference', fontsize=14, fontweight='bold')
+        
+        plt.tight_layout()
+        plt.savefig(self.output_dir / "memory_attention_preference.png", dpi=300, bbox_inches='tight')
         plt.close()
         
         # 2. Heatmap
