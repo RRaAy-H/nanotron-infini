@@ -26,6 +26,80 @@ from plotly.subplots import make_subplots
 import safetensors
 from safetensors import safe_open
 
+# Import formal plotting style for vector graphics
+try:
+    from formal_plot_style import (
+        ACADEMIC_COLORS, save_plotly_figure, save_matplotlib_figure,
+        create_comparison_colors, get_matplotlib_style, get_plotly_template
+    )
+    FORMAL_STYLE_AVAILABLE = True
+except ImportError:
+    print("Warning: formal_plot_style not available, using fallback plotting")
+    FORMAL_STYLE_AVAILABLE = False
+    
+    # Fallback color scheme
+    ACADEMIC_COLORS = {
+        'primary_blue': '#1f77b4',
+        'primary_red': '#d62728',
+        'primary_green': '#2ca02c',
+        'primary_orange': '#ff7f0e',
+        'memory_enabled': '#1f77b4',
+        'memory_disabled': '#d62728',
+        'improvement': '#2ca02c',
+        'degradation': '#d62728',
+        'neutral': '#7f7f7f'
+    }
+    
+    def save_plotly_figure(fig, output_path, html_filename, vector_filename, width=1200, height=800,
+                          vector_format='pdf', include_png=False):
+        """Fallback function if formal_plot_style is not available."""
+        output_path.mkdir(parents=True, exist_ok=True)
+        saved_files = []
+        
+        # Save HTML
+        html_path = output_path / f"{html_filename}.html"
+        fig.write_html(str(html_path))
+        saved_files.append(str(html_path))
+        
+        # Try vector format first
+        try:
+            vector_path = output_path / f"{vector_filename}.{vector_format}"
+            fig.write_image(str(vector_path), format=vector_format, width=width, height=height)
+            saved_files.append(str(vector_path))
+        except Exception as e:
+            print(f"Warning: Could not save {vector_format} image: {e}")
+            # Fallback to PNG
+            try:
+                png_path = output_path / f"{vector_filename}.png"
+                fig.write_image(str(png_path), width=width, height=height, scale=2)
+                saved_files.append(str(png_path))
+            except Exception as png_e:
+                print(f"Warning: PNG fallback also failed: {png_e}")
+        
+        return saved_files
+    
+    def save_matplotlib_figure(fig, output_path, filename, figsize=(12, 8), vector_format='pdf',
+                              include_png=False, dpi=300):
+        """Fallback function if formal_plot_style is not available."""
+        output_path.mkdir(parents=True, exist_ok=True)
+        fig.set_size_inches(figsize)
+        
+        # Try vector format first
+        try:
+            vector_path = output_path / f"{filename}.{vector_format}"
+            fig.savefig(str(vector_path), format=vector_format, bbox_inches='tight', facecolor='white')
+            return str(vector_path)
+        except Exception as e:
+            print(f"Warning: Could not save {vector_format} format: {e}")
+            # Fallback to PNG
+            try:
+                png_path = output_path / f"{filename}.png"
+                fig.savefig(str(png_path), dpi=dpi, bbox_inches='tight', facecolor='white')
+                return str(png_path)
+            except Exception as png_e:
+                print(f"Warning: PNG fallback also failed: {png_e}")
+                return None
+
 
 class NumpyEncoder(json.JSONEncoder):
     """Custom JSON encoder to handle numpy types."""
@@ -239,30 +313,34 @@ class BalanceFactorAnalyzer:
         
         # 1. Distribution histogram and pie chart
         fig = self._create_distribution_plot()
-        dist_path = self.output_dir / "balance_factor_distribution.html"
-        fig.write_html(str(dist_path))
-        viz_files.append(str(dist_path))
+        files = save_plotly_figure(
+            fig, self.output_dir,
+            "balance_factor_distribution", "balance_factor_distribution",
+            width=1200, height=700, vector_format='pdf'
+        )
+        viz_files.extend(files)
         
         # 2. Layer-head heatmap
         fig = self._create_heatmap()
-        heatmap_path = self.output_dir / "balance_factor_heatmap.html"
-        fig.write_html(str(heatmap_path))
-        viz_files.append(str(heatmap_path))
+        files = save_plotly_figure(
+            fig, self.output_dir,
+            "balance_factor_heatmap", "balance_factor_heatmap",
+            width=1200, height=600, vector_format='pdf'
+        )
+        viz_files.extend(files)
         
         # 3. Layer-wise statistics
         fig = self._create_layer_analysis()
-        layer_path = self.output_dir / "layer_wise_analysis.html"
-        fig.write_html(str(layer_path))
-        viz_files.append(str(layer_path))
+        files = save_plotly_figure(
+            fig, self.output_dir,
+            "layer_wise_analysis", "layer_wise_analysis",
+            width=1200, height=800, vector_format='pdf'
+        )
+        viz_files.extend(files)
         
         # 4. Static matplotlib plots for papers/presentations
-        self._create_publication_plots()
-        viz_files.extend([
-            str(self.output_dir / "balance_factor_distribution.png"),
-            str(self.output_dir / "memory_attention_preference.png"),
-            str(self.output_dir / "heatmap_static.png"),
-            str(self.output_dir / "layer_stats_static.png")
-        ])
+        static_files = self._create_publication_plots()
+        viz_files.extend(static_files)
         
         return viz_files
     
@@ -425,85 +503,113 @@ class BalanceFactorAnalyzer:
     def _create_publication_plots(self):
         """Create static plots for publications."""
         
-        # Set style
-        plt.style.use('seaborn-v0_8')
+        # Apply formal academic style if available
+        if FORMAL_STYLE_AVAILABLE:
+            get_matplotlib_style()
+        else:
+            plt.style.use('seaborn-v0_8')
         
         flat_weights = self.global_weights.flatten()
         
-        # 1. Distribution histogram (separate PNG)
+        # 1. Distribution histogram
         fig, ax = plt.subplots(1, 1, figsize=(8, 6))
-        ax.hist(flat_weights, bins=20, alpha=0.7, color='skyblue', edgecolor='black')
-        ax.set_xlabel('Balance Factor Value')
-        ax.set_ylabel('Frequency')
-        ax.set_title('Balance Factor Distribution')
-        ax.axvline(0.5, color='red', linestyle='--', alpha=0.7, label='Memory/Attention Threshold')
-        ax.legend()
+        ax.hist(flat_weights, bins=20, alpha=0.8, color=ACADEMIC_COLORS['primary_blue'], 
+               edgecolor='black', linewidth=1)
+        ax.set_xlabel('Balance Factor Value', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Frequency', fontsize=12, fontweight='bold')
+        ax.set_title('Balance Factor Distribution', fontsize=14, fontweight='bold')
+        ax.axvline(0.5, color=ACADEMIC_COLORS['primary_red'], linestyle='--', 
+                  linewidth=2, alpha=0.8, label='Memory/Attention Threshold')
+        ax.legend(fontsize=10)
         ax.grid(True, alpha=0.3)
+        ax.tick_params(axis='both', which='major', labelsize=10)
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / "balance_factor_distribution.png", dpi=300, bbox_inches='tight')
+        file_path = save_matplotlib_figure(fig, self.output_dir, "balance_factor_distribution", 
+                                         figsize=(8, 6), vector_format='pdf')
         plt.close()
         
-        # 2. Memory vs Attention Preference pie chart (separate PNG)
+        # 2. Memory vs Attention Preference pie chart
         fig, ax = plt.subplots(1, 1, figsize=(8, 8))
         memory_count = (flat_weights >= 0.5).sum()
         attention_count = (flat_weights < 0.5).sum()
-        ax.pie([memory_count, attention_count], 
+        
+        wedges, texts, autotexts = ax.pie([memory_count, attention_count], 
                labels=['Memory Preference (≥0.5)', 'Attention Preference (<0.5)'],
-               autopct='%1.1f%%', colors=['lightcoral', 'lightblue'],
-               startangle=90, textprops={'fontsize': 12})
+               autopct='%1.1f%%', 
+               colors=[ACADEMIC_COLORS['memory_enabled'], ACADEMIC_COLORS['memory_disabled']],
+               startangle=90, textprops={'fontsize': 10, 'fontweight': 'bold'})
+        
+        # Enhance autotext formatting
+        for autotext in autotexts:
+            autotext.set_color('white')
+            autotext.set_fontweight('bold')
+            
         ax.set_title('Memory vs Attention Preference', fontsize=14, fontweight='bold')
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / "memory_attention_preference.png", dpi=300, bbox_inches='tight')
+        file_path = save_matplotlib_figure(fig, self.output_dir, "memory_attention_preference", 
+                                         figsize=(8, 8), vector_format='pdf')
         plt.close()
         
-        # 2. Heatmap
+        # 3. Balance factors heatmap
         fig, ax = plt.subplots(figsize=(max(8, self.global_weights.shape[1] * 0.3), 
                                        max(6, self.global_weights.shape[0] * 0.2)))
         
         im = ax.imshow(self.global_weights, cmap='RdYlBu_r', aspect='auto', vmin=0, vmax=1)
-        ax.set_xlabel('Attention Head')
-        ax.set_ylabel('Layer')
-        ax.set_title('Balance Factors Heatmap')
+        ax.set_xlabel('Attention Head', fontsize=12, fontweight='bold')
+        ax.set_ylabel('Layer', fontsize=12, fontweight='bold')
+        ax.set_title('Balance Factors by Layer and Head', fontsize=14, fontweight='bold')
+        ax.tick_params(axis='both', which='major', labelsize=10)
         
         # Add colorbar
         cbar = plt.colorbar(im, ax=ax)
-        cbar.set_label('Balance Factor (0=Attention, 1=Memory)')
+        cbar.set_label('Balance Factor (0=Attention, 1=Memory)', fontsize=11)
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / "heatmap_static.png", dpi=300, bbox_inches='tight')
+        file_path = save_matplotlib_figure(fig, self.output_dir, "balance_factor_heatmap_static", 
+                                         figsize=(max(8, self.global_weights.shape[1] * 0.3), 
+                                                  max(6, self.global_weights.shape[0] * 0.2)), 
+                                         vector_format='pdf')
         plt.close()
         
-        # 3. Layer statistics
+        # 4. Layer statistics
         layer_means = np.mean(self.global_weights, axis=1)
         layer_stds = np.std(self.global_weights, axis=1)
         layers = list(range(len(layer_means)))
         
         fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
         
-        ax1.plot(layers, layer_means, 'o-', label='Mean')
+        ax1.plot(layers, layer_means, 'o-', color=ACADEMIC_COLORS['primary_blue'], 
+                linewidth=2, markersize=6, label='Mean')
         ax1.fill_between(layers, layer_means - layer_stds, layer_means + layer_stds, 
-                        alpha=0.3, label='±1 Std')
-        ax1.axhline(0.5, color='red', linestyle='--', alpha=0.7, label='Memory Threshold')
-        ax1.set_xlabel('Layer Index')
-        ax1.set_ylabel('Balance Factor')
-        ax1.set_title('Layer-wise Balance Factor Statistics')
-        ax1.legend()
+                        alpha=0.3, color=ACADEMIC_COLORS['primary_blue'], label='±1 Std')
+        ax1.axhline(0.5, color=ACADEMIC_COLORS['primary_red'], linestyle='--', 
+                   linewidth=2, alpha=0.8, label='Memory Threshold')
+        ax1.set_xlabel('Layer Index', fontsize=12, fontweight='bold')
+        ax1.set_ylabel('Balance Factor', fontsize=12, fontweight='bold')
+        ax1.set_title('Layer-wise Balance Factor Statistics', fontsize=14, fontweight='bold')
+        ax1.legend(fontsize=10)
         ax1.grid(True, alpha=0.3)
+        ax1.tick_params(axis='both', which='major', labelsize=10)
         
         memory_rates = np.mean(self.global_weights >= 0.5, axis=1)
-        ax2.plot(layers, memory_rates, 's-', color='orange', label='Memory Preference Rate')
-        ax2.set_xlabel('Layer Index')
-        ax2.set_ylabel('Memory Preference Rate')
-        ax2.set_title('Memory vs Attention Preference by Layer')
+        ax2.plot(layers, memory_rates, 's-', color=ACADEMIC_COLORS['primary_orange'], 
+                linewidth=2, markersize=6, label='Memory Preference Rate')
+        ax2.set_xlabel('Layer Index', fontsize=12, fontweight='bold')
+        ax2.set_ylabel('Memory Preference Rate', fontsize=12, fontweight='bold')
+        ax2.set_title('Memory vs Attention Preference by Layer', fontsize=14, fontweight='bold')
         ax2.set_ylim(0, 1)
-        ax2.legend()
+        ax2.legend(fontsize=10)
         ax2.grid(True, alpha=0.3)
+        ax2.tick_params(axis='both', which='major', labelsize=10)
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / "layer_stats_static.png", dpi=300, bbox_inches='tight')
+        file_path = save_matplotlib_figure(fig, self.output_dir, "layer_balance_factor_analysis", 
+                                         figsize=(10, 8), vector_format='pdf')
         plt.close()
+        
+        return []  # Return list of created files
     
     def generate_report(self) -> Dict[str, Any]:
         """Generate comprehensive analysis report."""
