@@ -26,6 +26,81 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from scipy import stats
 
+# Import formal plotting style configuration
+try:
+    from formal_plot_style import (
+        ACADEMIC_COLORS, save_plotly_figure, save_matplotlib_figure,
+        create_comparison_colors
+    )
+except ImportError:
+    print("⚠️  Warning: formal_plot_style module not found. Using default styling.")
+    # Fallback colors if formal_plot_style is not available
+    ACADEMIC_COLORS = {
+        'memory_enabled': '#1f77b4',
+        'memory_disabled': '#d62728',
+        'primary_blue': '#1f77b4',
+        'primary_red': '#d62728',
+        'primary_green': '#2ca02c',
+        'primary_orange': '#ff7f0e',
+        'improvement': '#2ca02c',
+        'degradation': '#d62728',
+        'neutral': '#7f7f7f'
+    }
+    
+    def save_plotly_figure(fig, output_path, html_filename, vector_filename, width=1200, height=800,
+                          vector_format='pdf', include_png=False):
+        """Fallback function if formal_plot_style is not available."""
+        output_path.mkdir(parents=True, exist_ok=True)
+        saved_files = []
+        
+        # Save HTML
+        html_path = output_path / f"{html_filename}.html"
+        fig.write_html(str(html_path))
+        saved_files.append(str(html_path))
+        
+        # Try vector format first
+        try:
+            vector_path = output_path / f"{vector_filename}.{vector_format}"
+            fig.write_image(str(vector_path), format=vector_format, width=width, height=height)
+            saved_files.append(str(vector_path))
+        except Exception as e:
+            print(f"Warning: Could not save {vector_format} image: {e}")
+            # Fallback to PNG
+            try:
+                png_path = output_path / f"{vector_filename}.png"
+                fig.write_image(str(png_path), width=width, height=height, scale=2)
+                saved_files.append(str(png_path))
+            except Exception as png_e:
+                print(f"Warning: PNG fallback also failed: {png_e}")
+        
+        return saved_files
+    
+    def save_matplotlib_figure(fig, output_path, filename, figsize=(12, 8), vector_format='pdf',
+                              include_png=False, dpi=300):
+        """Fallback function if formal_plot_style is not available."""
+        output_path.mkdir(parents=True, exist_ok=True)
+        fig.set_size_inches(figsize)
+        
+        # Try vector format first
+        try:
+            vector_path = output_path / f"{filename}.{vector_format}"
+            fig.savefig(str(vector_path), format=vector_format, bbox_inches='tight', facecolor='white')
+            return str(vector_path)
+        except Exception as e:
+            print(f"Warning: Could not save {vector_format} format: {e}")
+            # Fallback to PNG
+            try:
+                png_path = output_path / f"{filename}.png"
+                fig.savefig(str(png_path), dpi=dpi, bbox_inches='tight', facecolor='white')
+                return str(png_path)
+            except Exception as png_e:
+                print(f"Warning: PNG fallback also failed: {png_e}")
+                return None
+    
+    def create_comparison_colors(values, threshold=0.0):
+        """Fallback function if formal_plot_style is not available."""
+        return ['#2ca02c' if v > threshold else '#d62728' if v < threshold else '#7f7f7f' for v in values]
+
 # Import nanotron components
 import sys
 sys.path.append('src')
@@ -707,42 +782,52 @@ class ProgressiveContextTester:
         return scaling
     
     def create_visualizations(self, results: Dict) -> List[str]:
-        """Create comprehensive visualizations of progressive testing results."""
+        """Create comprehensive visualizations of progressive testing results with formal academic styling."""
         
         viz_files = []
+        
+        print("  Creating formal publication-ready visualizations...")
         
         # 1. Performance vs context length
         if results['results_with_memory'] or results['results_without_memory']:
             fig = self._create_performance_vs_context_plot(results)
-            perf_path = self.output_dir / "performance_vs_context_length.html"
-            fig.write_html(str(perf_path))
-            viz_files.append(str(perf_path))
+            files = save_plotly_figure(
+                fig, self.output_dir,
+                "performance_vs_context_length", "performance_vs_context_plot",
+                width=1200, height=800, vector_format='pdf'
+            )
+            viz_files.extend(files)
         
         # 2. Scaling analysis plot
         if 'scaling_analysis' in results:
             fig = self._create_scaling_analysis_plot(results)
-            scaling_path = self.output_dir / "scaling_analysis.html"
-            fig.write_html(str(scaling_path))
-            viz_files.append(str(scaling_path))
+            files = save_plotly_figure(
+                fig, self.output_dir,
+                "scaling_analysis", "scaling_analysis_plot",
+                width=1200, height=900, vector_format='pdf'
+            )
+            viz_files.extend(files)
         
         # 3. Performance trends plot
         if 'performance_trends' in results:
             fig = self._create_trends_plot(results['performance_trends'])
-            trends_path = self.output_dir / "performance_trends.html"
-            fig.write_html(str(trends_path))
-            viz_files.append(str(trends_path))
+            files = save_plotly_figure(
+                fig, self.output_dir,
+                "performance_trends", "performance_trends_plot",
+                width=1200, height=800, vector_format='pdf'
+            )
+            viz_files.extend(files)
         
         # 4. Static plots for publications
-        self._create_publication_plots(results)
-        viz_files.extend([
-            str(self.output_dir / "progressive_performance_static.png"),
-            str(self.output_dir / "memory_scaling_static.png")
-        ])
+        static_files = self._create_publication_plots(results)
+        viz_files.extend(static_files)
+        
+        print(f"  Generated {len(viz_files)} visualization files")
         
         return viz_files
     
     def _create_performance_vs_context_plot(self, results: Dict):
-        """Create performance vs context length plot."""
+        """Create performance vs context length plot with formal academic styling."""
         
         fig = go.Figure()
         
@@ -756,11 +841,18 @@ class ProgressiveContextTester:
             fig.add_trace(go.Scatter(
                 x=context_lengths,
                 y=accuracies,
-                error_y=dict(type='data', array=stds, visible=True),
+                error_y=dict(
+                    type='data', 
+                    array=stds, 
+                    visible=True,
+                    color=ACADEMIC_COLORS['memory_enabled'],
+                    thickness=2,
+                    width=4
+                ),
                 mode='lines+markers',
-                name='With Memory',
-                line=dict(color='blue', width=3),
-                marker=dict(size=8)
+                name='With Infini-Attention Memory',
+                line=dict(color=ACADEMIC_COLORS['memory_enabled'], width=3),
+                marker=dict(size=10, symbol='circle', line=dict(width=2, color='white'))
             ))
         
         # Plot without memory if available
@@ -773,21 +865,61 @@ class ProgressiveContextTester:
             fig.add_trace(go.Scatter(
                 x=context_lengths,
                 y=accuracies,
-                error_y=dict(type='data', array=stds, visible=True),
+                error_y=dict(
+                    type='data', 
+                    array=stds, 
+                    visible=True,
+                    color=ACADEMIC_COLORS['memory_disabled'],
+                    thickness=2,
+                    width=4
+                ),
                 mode='lines+markers',
-                name='Without Memory',
-                line=dict(color='red', width=3),
-                marker=dict(size=8)
+                name='Without Memory (Baseline)',
+                line=dict(color=ACADEMIC_COLORS['memory_disabled'], width=3),
+                marker=dict(size=10, symbol='square', line=dict(width=2, color='white'))
             ))
         
         fig.update_layout(
-            title='Performance vs Context Length',
-            xaxis_title='Context Length (tokens)',
-            yaxis_title='Accuracy',
-            yaxis=dict(range=[0, 1]),
-            width=900,
-            height=600,
-            legend=dict(x=0.7, y=0.95)
+            title=dict(
+                text='Progressive Context Length Performance Analysis',
+                font=dict(size=18, family='Times New Roman'),
+                x=0.5,
+                xanchor='center'
+            ),
+            xaxis=dict(
+                title='Context Length (tokens)',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+            ),
+            yaxis=dict(
+                title='Task Accuracy',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                range=[0, 1.05],
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+            ),
+            legend=dict(
+                x=0.02,
+                y=0.98,
+                bgcolor='rgba(255,255,255,0.9)',
+                bordercolor='black',
+                borderwidth=1,
+                font=dict(size=12, family='Times New Roman')
+            ),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=80, r=50, t=80, b=60)
         )
         
         return fig
@@ -922,9 +1054,9 @@ class ProgressiveContextTester:
         return fig
     
     def _create_publication_plots(self, results: Dict):
-        """Create static plots for publications."""
+        """Create static plots for publications with formal academic styling."""
         
-        plt.style.use('seaborn-v0_8')
+        created_files = []
         
         # Performance vs context length
         fig, ax = plt.subplots(figsize=(12, 8))
@@ -936,7 +1068,9 @@ class ProgressiveContextTester:
             stds = [mem_results[length]['statistics']['accuracy_std'] for length in context_lengths]
             
             ax.errorbar(context_lengths, accuracies, yerr=stds, 
-                       marker='o', linewidth=3, label='With Memory', color='blue', markersize=8)
+                       marker='o', linewidth=3, markersize=10, capsize=5, capthick=2,
+                       label='With Infini-Attention Memory', 
+                       color=ACADEMIC_COLORS['memory_enabled'])
         
         if results['results_without_memory']:
             no_mem_results = results['results_without_memory']
@@ -945,17 +1079,23 @@ class ProgressiveContextTester:
             stds = [no_mem_results[length]['statistics']['accuracy_std'] for length in context_lengths]
             
             ax.errorbar(context_lengths, accuracies, yerr=stds,
-                       marker='s', linewidth=3, label='Without Memory', color='red', markersize=8)
+                       marker='s', linewidth=3, markersize=10, capsize=5, capthick=2,
+                       label='Without Memory (Baseline)', 
+                       color=ACADEMIC_COLORS['memory_disabled'])
         
-        ax.set_xlabel('Context Length (tokens)', fontsize=14)
-        ax.set_ylabel('Accuracy', fontsize=14)
-        ax.set_title('Progressive Context Length Performance', fontsize=16, fontweight='bold')
-        ax.legend(fontsize=12)
-        ax.grid(True, alpha=0.3)
-        ax.set_ylim(0, 1)
+        ax.set_xlabel('Context Length (tokens)', fontsize=14, fontweight='bold')
+        ax.set_ylabel('Task Accuracy', fontsize=14, fontweight='bold')
+        ax.set_title('Progressive Context Length Performance Analysis', fontsize=16, fontweight='bold')
+        ax.legend(fontsize=12, frameon=True, fancybox=True, shadow=True)
+        ax.grid(True, alpha=0.3, linewidth=0.8)
+        ax.set_ylim(0, 1.05)
+        ax.tick_params(axis='both', which='major', labelsize=12)
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / "progressive_performance_static.png", dpi=300, bbox_inches='tight')
+        file_path = save_matplotlib_figure(fig, self.output_dir, "progressive_performance_analysis", 
+                                         figsize=(12, 8), vector_format='pdf')
+        if file_path:
+            created_files.append(file_path)
         plt.close()
         
         # Memory scaling analysis
@@ -971,14 +1111,16 @@ class ProgressiveContextTester:
                 
                 fig, ax = plt.subplots(figsize=(12, 6))
                 
-                colors = ['green' if d > 0 else 'red' for d in differences]
-                bars = ax.bar(context_lengths, differences, color=colors, alpha=0.7)
+                colors = create_comparison_colors(differences, threshold=0.0)
+                bars = ax.bar(context_lengths, differences, color=colors, alpha=0.8,
+                             edgecolor='black', linewidth=1)
                 
-                ax.axhline(y=0, color='black', linestyle='-', alpha=0.5)
-                ax.set_xlabel('Context Length (tokens)', fontsize=14)
-                ax.set_ylabel('Memory Advantage (Accuracy Difference)', fontsize=14)
+                ax.axhline(y=0, color='black', linestyle='-', alpha=0.7, linewidth=2)
+                ax.set_xlabel('Context Length (tokens)', fontsize=14, fontweight='bold')
+                ax.set_ylabel('Memory Advantage (Accuracy Difference)', fontsize=14, fontweight='bold')
                 ax.set_title('Memory Mechanism Scaling Analysis', fontsize=16, fontweight='bold')
-                ax.grid(True, alpha=0.3)
+                ax.grid(True, alpha=0.3, linewidth=0.8)
+                ax.tick_params(axis='both', which='major', labelsize=12)
                 
                 # Add value labels on bars
                 for bar, diff in zip(bars, differences):
@@ -986,11 +1128,17 @@ class ProgressiveContextTester:
                     ax.text(bar.get_x() + bar.get_width()/2., 
                            height + (0.01 if height >= 0 else -0.01),
                            f'{diff:.2f}', ha='center', 
-                           va='bottom' if height >= 0 else 'top', fontsize=10)
+                           va='bottom' if height >= 0 else 'top', 
+                           fontsize=11, fontweight='bold')
                 
                 plt.tight_layout()
-                plt.savefig(self.output_dir / "memory_scaling_static.png", dpi=300, bbox_inches='tight')
+                file_path = save_matplotlib_figure(fig, self.output_dir, "memory_scaling_analysis", 
+                                                 figsize=(12, 6), vector_format='pdf')
+                if file_path:
+                    created_files.append(file_path)
                 plt.close()
+        
+        return created_files
     
     def generate_comprehensive_report(self, results: Dict) -> Dict[str, Any]:
         """Generate comprehensive progressive testing report."""

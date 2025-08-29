@@ -29,6 +29,80 @@ import seaborn as sns
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+# Import formal plotting style configuration
+try:
+    from formal_plot_style import (
+        ACADEMIC_COLORS, save_plotly_figure, save_matplotlib_figure,
+        create_comparison_colors
+    )
+except ImportError:
+    print("⚠️  Warning: formal_plot_style module not found. Using default styling.")
+    # Fallback colors if formal_plot_style is not available
+    ACADEMIC_COLORS = {
+        'primary_blue': '#1f77b4',
+        'primary_red': '#d62728',
+        'primary_green': '#2ca02c',
+        'primary_orange': '#ff7f0e',
+        'primary_purple': '#9467bd',
+        'improvement': '#2ca02c',
+        'degradation': '#d62728',
+        'neutral': '#7f7f7f'
+    }
+    
+    def save_plotly_figure(fig, output_path, html_filename, vector_filename, width=1200, height=800,
+                          vector_format='pdf', include_png=False):
+        """Fallback function if formal_plot_style is not available."""
+        output_path.mkdir(parents=True, exist_ok=True)
+        saved_files = []
+        
+        # Save HTML
+        html_path = output_path / f"{html_filename}.html"
+        fig.write_html(str(html_path))
+        saved_files.append(str(html_path))
+        
+        # Try vector format first
+        try:
+            vector_path = output_path / f"{vector_filename}.{vector_format}"
+            fig.write_image(str(vector_path), format=vector_format, width=width, height=height)
+            saved_files.append(str(vector_path))
+        except Exception as e:
+            print(f"Warning: Could not save {vector_format} image: {e}")
+            # Fallback to PNG
+            try:
+                png_path = output_path / f"{vector_filename}.png"
+                fig.write_image(str(png_path), width=width, height=height, scale=2)
+                saved_files.append(str(png_path))
+            except Exception as png_e:
+                print(f"Warning: PNG fallback also failed: {png_e}")
+        
+        return saved_files
+    
+    def save_matplotlib_figure(fig, output_path, filename, figsize=(12, 8), vector_format='pdf',
+                              include_png=False, dpi=300):
+        """Fallback function if formal_plot_style is not available."""
+        output_path.mkdir(parents=True, exist_ok=True)
+        fig.set_size_inches(figsize)
+        
+        # Try vector format first
+        try:
+            vector_path = output_path / f"{filename}.{vector_format}"
+            fig.savefig(str(vector_path), format=vector_format, bbox_inches='tight', facecolor='white')
+            return str(vector_path)
+        except Exception as e:
+            print(f"Warning: Could not save {vector_format} format: {e}")
+            # Fallback to PNG
+            try:
+                png_path = output_path / f"{filename}.png"
+                fig.savefig(str(png_path), dpi=dpi, bbox_inches='tight', facecolor='white')
+                return str(png_path)
+            except Exception as png_e:
+                print(f"Warning: PNG fallback also failed: {png_e}")
+                return None
+    
+    def create_comparison_colors(values, threshold=0.0):
+        """Fallback function if formal_plot_style is not available."""
+        return ['#2ca02c' if v > threshold else '#d62728' if v < threshold else '#7f7f7f' for v in values]
+
 # Import nanotron components
 import sys
 sys.path.append('src')
@@ -646,44 +720,54 @@ class MemoryContentAnalyzer:
         return similarity_analysis
     
     def create_visualizations(self, results: Dict[str, Any]) -> List[str]:
-        """Create comprehensive visualizations of memory content analysis."""
+        """Create comprehensive visualizations of memory content analysis with formal academic styling."""
         
         viz_files = []
+        
+        print("  Creating formal publication-ready visualizations...")
         
         # 1. Information retention performance
         if 'test_results' in results and results['test_results']:
             fig = self._create_retention_performance_plot(results['test_results'])
-            perf_path = self.output_dir / "retention_performance.html"
-            fig.write_html(str(perf_path))
-            viz_files.append(str(perf_path))
+            files = save_plotly_figure(
+                fig, self.output_dir,
+                "retention_performance", "retention_performance_plot",
+                width=1200, height=700, vector_format='pdf'
+            )
+            viz_files.extend(files)
         
         # 2. Memory evolution plot
         if 'memory_analysis' in results and 'memory_evolution' in results['memory_analysis']:
             fig = self._create_memory_evolution_plot(results['memory_analysis']['memory_evolution'])
-            evolution_path = self.output_dir / "memory_evolution.html"
-            fig.write_html(str(evolution_path))
-            viz_files.append(str(evolution_path))
+            files = save_plotly_figure(
+                fig, self.output_dir,
+                "memory_evolution", "memory_evolution_plot",
+                width=1200, height=800, vector_format='pdf'
+            )
+            viz_files.extend(files)
         
         # 3. Compression analysis
         if ('memory_analysis' in results and 
             'information_compression' in results['memory_analysis'] and
             'compression_ratios' in results['memory_analysis']['information_compression']):
             fig = self._create_compression_plot(results['memory_analysis']['information_compression'])
-            comp_path = self.output_dir / "compression_analysis.html"
-            fig.write_html(str(comp_path))
-            viz_files.append(str(comp_path))
+            files = save_plotly_figure(
+                fig, self.output_dir,
+                "compression_analysis", "compression_analysis_plot",
+                width=1200, height=700, vector_format='pdf'
+            )
+            viz_files.extend(files)
         
         # 4. Static plots for publications
-        self._create_publication_plots(results)
-        viz_files.extend([
-            str(self.output_dir / "retention_performance_static.png"),
-            str(self.output_dir / "memory_content_static.png")
-        ])
+        static_files = self._create_publication_plots(results)
+        viz_files.extend(static_files)
+        
+        print(f"  Generated {len(viz_files)} visualization files")
         
         return viz_files
     
     def _create_retention_performance_plot(self, test_results: List[Dict]):
-        """Create information retention performance plot."""
+        """Create information retention performance plot with formal academic styling."""
         
         # Group by test type
         types = {}
@@ -696,16 +780,32 @@ class MemoryContentAnalyzer:
             types[test_type]['accuracies'].append(1.0 if result['is_correct'] else 0.0)
             types[test_type]['segments'].append(result['segments_crossed'])
         
-        # Create subplot
+        # Create subplot with formal styling
         fig = make_subplots(
             rows=1, cols=2,
-            subplot_titles=['Accuracy vs Information Position', 'Accuracy vs Segments Crossed']
+            subplot_titles=[
+                '(a) Accuracy vs Information Position',
+                '(b) Accuracy vs Memory Segments'
+            ],
+            horizontal_spacing=0.12
         )
         
-        colors = ['blue', 'red', 'green', 'orange', 'purple']
+        # Use academic color palette
+        academic_colors = [
+            ACADEMIC_COLORS['primary_blue'],
+            ACADEMIC_COLORS['primary_red'],
+            ACADEMIC_COLORS['primary_green'],
+            ACADEMIC_COLORS['primary_orange'],
+            ACADEMIC_COLORS['primary_purple']
+        ]
+        
+        # Define marker symbols for different test types
+        marker_symbols = ['circle', 'square', 'diamond', 'triangle-up', 'star']
         
         for i, (test_type, data) in enumerate(types.items()):
-            color = colors[i % len(colors)]
+            color = academic_colors[i % len(academic_colors)]
+            symbol = marker_symbols[i % len(marker_symbols)]
+            formatted_name = test_type.replace('_', ' ').title()
             
             # Position plot
             fig.add_trace(
@@ -713,8 +813,13 @@ class MemoryContentAnalyzer:
                     x=data['positions'],
                     y=data['accuracies'],
                     mode='markers',
-                    name=test_type.replace('_', ' ').title(),
-                    marker=dict(color=color, size=10),
+                    name=formatted_name,
+                    marker=dict(
+                        color=color, 
+                        size=12, 
+                        symbol=symbol,
+                        line=dict(width=2, color='white')
+                    ),
                     showlegend=True
                 ),
                 row=1, col=1
@@ -726,32 +831,103 @@ class MemoryContentAnalyzer:
                     x=data['segments'],
                     y=data['accuracies'],
                     mode='markers',
-                    name=test_type.replace('_', ' ').title(),
-                    marker=dict(color=color, size=10),
+                    name=formatted_name,
+                    marker=dict(
+                        color=color, 
+                        size=12, 
+                        symbol=symbol,
+                        line=dict(width=2, color='white')
+                    ),
                     showlegend=False
                 ),
                 row=1, col=2
             )
         
+        # Update layout with formal academic styling
         fig.update_layout(
-            title='Information Retention Performance Analysis',
-            height=500,
-            width=1000
+            title=dict(
+                text='Information Retention Performance Analysis',
+                font=dict(size=18, family='Times New Roman'),
+                x=0.5,
+                xanchor='center'
+            ),
+            legend=dict(
+                x=0.02,
+                y=0.98,
+                bgcolor='rgba(255,255,255,0.9)',
+                bordercolor='black',
+                borderwidth=1,
+                font=dict(size=12, family='Times New Roman')
+            ),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=80, r=50, t=80, b=60)
         )
         
-        fig.update_xaxes(title_text='Token Position', row=1, col=1)
-        fig.update_xaxes(title_text='Segments Crossed', row=1, col=2)
-        fig.update_yaxes(title_text='Accuracy', row=1, col=1)
-        fig.update_yaxes(title_text='Accuracy', row=1, col=2)
+        # Update axes with formal styling
+        fig.update_xaxes(
+            title_text='Token Position in Context',
+            title_font=dict(size=14, family='Times New Roman'),
+            tickfont=dict(size=12, family='Times New Roman'),
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray',
+            showline=True,
+            linewidth=2,
+            linecolor='black',
+            row=1, col=1
+        )
+        fig.update_xaxes(
+            title_text='Memory Segments Traversed',
+            title_font=dict(size=14, family='Times New Roman'),
+            tickfont=dict(size=12, family='Times New Roman'),
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray',
+            showline=True,
+            linewidth=2,
+            linecolor='black',
+            row=1, col=2
+        )
+        fig.update_yaxes(
+            title_text='Retrieval Accuracy',
+            title_font=dict(size=14, family='Times New Roman'),
+            tickfont=dict(size=12, family='Times New Roman'),
+            range=[-0.05, 1.05],
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray',
+            showline=True,
+            linewidth=2,
+            linecolor='black',
+            row=1, col=1
+        )
+        fig.update_yaxes(
+            title_text='Retrieval Accuracy',
+            title_font=dict(size=14, family='Times New Roman'),
+            tickfont=dict(size=12, family='Times New Roman'),
+            range=[-0.05, 1.05],
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray',
+            showline=True,
+            linewidth=2,
+            linecolor='black',
+            row=1, col=2
+        )
         
         return fig
     
     def _create_memory_evolution_plot(self, evolution_data: List[Dict]):
-        """Create memory evolution plot."""
+        """Create memory evolution plot with formal academic styling."""
         
         fig = make_subplots(
             rows=2, cols=1,
-            subplot_titles=['Memory Norm Evolution', 'Memory Entropy Evolution']
+            subplot_titles=[
+                '(a) Memory Norm Evolution',
+                '(b) Memory Entropy Evolution'
+            ],
+            vertical_spacing=0.12
         )
         
         steps = [e['step'] for e in evolution_data]
@@ -759,45 +935,89 @@ class MemoryContentAnalyzer:
         entropies = [e['memory_entropy'] for e in evolution_data]
         positions = [e['token_position'] for e in evolution_data]
         
-        # Memory norm
+        # Memory norm with formal styling
         fig.add_trace(
             go.Scatter(
                 x=positions,
                 y=norms,
                 mode='lines+markers',
                 name='Memory Norm',
-                line=dict(color='blue')
+                line=dict(color=ACADEMIC_COLORS['primary_blue'], width=3),
+                marker=dict(size=8, symbol='circle', line=dict(width=2, color='white'))
             ),
             row=1, col=1
         )
         
-        # Memory entropy
+        # Memory entropy with formal styling
         fig.add_trace(
             go.Scatter(
                 x=positions,
                 y=entropies,
                 mode='lines+markers',
                 name='Memory Entropy',
-                line=dict(color='red'),
+                line=dict(color=ACADEMIC_COLORS['primary_red'], width=3),
+                marker=dict(size=8, symbol='square', line=dict(width=2, color='white')),
                 showlegend=False
             ),
             row=2, col=1
         )
         
+        # Update layout with formal academic styling
         fig.update_layout(
-            title='Memory Content Evolution Over Time',
-            height=600,
-            showlegend=False
+            title=dict(
+                text='Memory Content Evolution Over Processing',
+                font=dict(size=18, family='Times New Roman'),
+                x=0.5,
+                xanchor='center'
+            ),
+            showlegend=False,
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=80, r=50, t=80, b=60)
         )
         
-        fig.update_xaxes(title_text='Token Position', row=2, col=1)
-        fig.update_yaxes(title_text='Memory Norm', row=1, col=1)
-        fig.update_yaxes(title_text='Memory Entropy', row=2, col=1)
+        # Update axes with formal styling
+        fig.update_xaxes(
+            title_text='Token Position in Context',
+            title_font=dict(size=14, family='Times New Roman'),
+            tickfont=dict(size=12, family='Times New Roman'),
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray',
+            showline=True,
+            linewidth=2,
+            linecolor='black',
+            row=2, col=1
+        )
+        fig.update_yaxes(
+            title_text='Memory Norm (L2)',
+            title_font=dict(size=14, family='Times New Roman'),
+            tickfont=dict(size=12, family='Times New Roman'),
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray',
+            showline=True,
+            linewidth=2,
+            linecolor='black',
+            row=1, col=1
+        )
+        fig.update_yaxes(
+            title_text='Memory Entropy (bits)',
+            title_font=dict(size=14, family='Times New Roman'),
+            tickfont=dict(size=12, family='Times New Roman'),
+            showgrid=True,
+            gridwidth=1,
+            gridcolor='lightgray',
+            showline=True,
+            linewidth=2,
+            linecolor='black',
+            row=2, col=1
+        )
         
         return fig
     
     def _create_compression_plot(self, compression_data: Dict):
-        """Create compression analysis plot."""
+        """Create compression analysis plot with formal academic styling."""
         
         ratios_data = compression_data['compression_ratios']
         steps = [r['step'] for r in ratios_data]
@@ -811,29 +1031,73 @@ class MemoryContentAnalyzer:
                 y=ratios,
                 mode='lines+markers',
                 name='Compression Ratio',
-                line=dict(color='green', width=3),
-                marker=dict(size=8)
+                line=dict(color=ACADEMIC_COLORS['primary_green'], width=3),
+                marker=dict(
+                    size=10, 
+                    symbol='circle',
+                    line=dict(width=2, color='white')
+                )
             )
         )
         
+        # Add optimal compression reference line if needed
+        if ratios:
+            optimal_ratio = max(ratios)
+            fig.add_hline(
+                y=optimal_ratio,
+                line_dash="dash",
+                line_color=ACADEMIC_COLORS['neutral'],
+                line_width=2,
+                annotation_text=f"Peak Efficiency: {optimal_ratio:.2f}",
+                annotation_position="top right",
+                annotation_font=dict(size=12, family='Times New Roman')
+            )
+        
         fig.update_layout(
-            title='Information Compression Efficiency',
-            xaxis_title='Memory Update Step',
-            yaxis_title='Compression Ratio (Original/Compressed)',
-            width=800,
-            height=500
+            title=dict(
+                text='Information Compression Efficiency Over Time',
+                font=dict(size=18, family='Times New Roman'),
+                x=0.5,
+                xanchor='center'
+            ),
+            xaxis=dict(
+                title='Memory Update Step',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+            ),
+            yaxis=dict(
+                title='Compression Ratio (Original Size / Compressed Size)',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+            ),
+            showlegend=False,
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=80, r=50, t=80, b=60)
         )
         
         return fig
     
     def _create_publication_plots(self, results: Dict):
-        """Create static plots for publications."""
+        """Create static plots for publications with formal academic styling."""
         
-        plt.style.use('seaborn-v0_8')
+        created_files = []
         
         if 'test_results' in results and results['test_results']:
             # Retention performance plot
-            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
             
             test_results = results['test_results']
             
@@ -847,19 +1111,35 @@ class MemoryContentAnalyzer:
                 types[test_type]['positions'].append(result['info_position'])
                 types[test_type]['accuracies'].append(1.0 if result['is_correct'] else 0.0)
             
-            colors = ['blue', 'red', 'green', 'orange', 'purple']
+            # Use academic colors
+            academic_colors = [
+                ACADEMIC_COLORS['primary_blue'],
+                ACADEMIC_COLORS['primary_red'],
+                ACADEMIC_COLORS['primary_green'],
+                ACADEMIC_COLORS['primary_orange'],
+                ACADEMIC_COLORS['primary_purple']
+            ]
+            
+            # Marker symbols for different types
+            marker_symbols = ['o', 's', '^', 'D', '*']
             
             for i, (test_type, data) in enumerate(types.items()):
-                color = colors[i % len(colors)]
+                color = academic_colors[i % len(academic_colors)]
+                marker = marker_symbols[i % len(marker_symbols)]
+                formatted_name = test_type.replace('_', ' ').title()
+                
                 ax1.scatter(data['positions'], data['accuracies'], 
-                           label=test_type.replace('_', ' ').title(), 
-                           color=color, s=60, alpha=0.7)
+                           label=formatted_name, 
+                           color=color, s=80, alpha=0.8, marker=marker,
+                           edgecolors='white', linewidth=1.5)
             
-            ax1.set_xlabel('Information Position (Tokens)')
-            ax1.set_ylabel('Retrieval Accuracy')
-            ax1.set_title('Information Retention by Position')
-            ax1.legend()
-            ax1.grid(True, alpha=0.3)
+            ax1.set_xlabel('Information Position (tokens)', fontsize=14, fontweight='bold')
+            ax1.set_ylabel('Retrieval Accuracy', fontsize=14, fontweight='bold')
+            ax1.set_title('(a) Information Retention by Position', fontsize=14, fontweight='bold')
+            ax1.legend(fontsize=12, frameon=True, fancybox=True, shadow=True)
+            ax1.grid(True, alpha=0.3, linewidth=0.8)
+            ax1.set_ylim(-0.05, 1.05)
+            ax1.tick_params(axis='both', which='major', labelsize=12)
             
             # Overall accuracy by test type
             type_accuracies = []
@@ -868,47 +1148,71 @@ class MemoryContentAnalyzer:
                 type_accuracies.append(np.mean(data['accuracies']))
                 type_names.append(test_type.replace('_', ' ').title())
             
-            bars = ax2.bar(type_names, type_accuracies, color=colors[:len(type_names)], alpha=0.7)
-            ax2.set_ylabel('Average Accuracy')
-            ax2.set_title('Accuracy by Information Type')
-            ax2.set_ylim(0, 1)
+            bars = ax2.bar(type_names, type_accuracies, 
+                          color=academic_colors[:len(type_names)], alpha=0.8,
+                          edgecolor='black', linewidth=1)
+            ax2.set_ylabel('Average Accuracy', fontsize=14, fontweight='bold')
+            ax2.set_title('(b) Accuracy by Information Type', fontsize=14, fontweight='bold')
+            ax2.set_ylim(0, 1.05)
+            ax2.tick_params(axis='both', which='major', labelsize=12)
+            ax2.grid(True, alpha=0.3, linewidth=0.8)
             
             # Add value labels on bars
             for bar, acc in zip(bars, type_accuracies):
                 height = bar.get_height()
-                ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                        f'{acc:.2f}', ha='center', va='bottom')
+                ax2.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                        f'{acc:.2f}', ha='center', va='bottom', 
+                        fontsize=11, fontweight='bold')
             
-            plt.xticks(rotation=45)
+            plt.xticks(rotation=45, ha='right')
             plt.tight_layout()
-            plt.savefig(self.output_dir / "retention_performance_static.png", dpi=300, bbox_inches='tight')
+            file_path = save_matplotlib_figure(fig, self.output_dir, "retention_performance_analysis", 
+                                             figsize=(16, 6), vector_format='pdf')
+            if file_path:
+                created_files.append(file_path)
             plt.close()
         
-        # Memory content analysis plot
+        # Memory content evolution analysis plot
         if ('memory_analysis' in results and 
             'memory_evolution' in results['memory_analysis']):
             
             evolution_data = results['memory_analysis']['memory_evolution']
             
-            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 8))
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
             
             positions = [e['token_position'] for e in evolution_data]
             norms = [e['memory_norm'] for e in evolution_data]
             entropies = [e['memory_entropy'] for e in evolution_data]
             
-            ax1.plot(positions, norms, 'b-o', linewidth=2, markersize=4)
-            ax1.set_ylabel('Memory Norm')
-            ax1.set_title('Memory Content Evolution')
-            ax1.grid(True, alpha=0.3)
+            # Memory norm evolution
+            ax1.plot(positions, norms, 
+                    color=ACADEMIC_COLORS['primary_blue'], linewidth=3, 
+                    marker='o', markersize=6, markerfacecolor='white',
+                    markeredgecolor=ACADEMIC_COLORS['primary_blue'], markeredgewidth=2)
+            ax1.set_ylabel('Memory Norm (L2)', fontsize=14, fontweight='bold')
+            ax1.set_title('(a) Memory Norm Evolution', fontsize=14, fontweight='bold')
+            ax1.grid(True, alpha=0.3, linewidth=0.8)
+            ax1.tick_params(axis='both', which='major', labelsize=12)
             
-            ax2.plot(positions, entropies, 'r-s', linewidth=2, markersize=4)
-            ax2.set_xlabel('Token Position')
-            ax2.set_ylabel('Memory Entropy')
-            ax2.grid(True, alpha=0.3)
+            # Memory entropy evolution
+            ax2.plot(positions, entropies, 
+                    color=ACADEMIC_COLORS['primary_red'], linewidth=3,
+                    marker='s', markersize=6, markerfacecolor='white',
+                    markeredgecolor=ACADEMIC_COLORS['primary_red'], markeredgewidth=2)
+            ax2.set_xlabel('Token Position in Context', fontsize=14, fontweight='bold')
+            ax2.set_ylabel('Memory Entropy (bits)', fontsize=14, fontweight='bold')
+            ax2.set_title('(b) Memory Entropy Evolution', fontsize=14, fontweight='bold')
+            ax2.grid(True, alpha=0.3, linewidth=0.8)
+            ax2.tick_params(axis='both', which='major', labelsize=12)
             
             plt.tight_layout()
-            plt.savefig(self.output_dir / "memory_content_static.png", dpi=300, bbox_inches='tight')
+            file_path = save_matplotlib_figure(fig, self.output_dir, "memory_content_evolution_analysis", 
+                                             figsize=(12, 10), vector_format='pdf')
+            if file_path:
+                created_files.append(file_path)
             plt.close()
+        
+        return created_files
     
     def generate_comprehensive_report(self, results: Dict[str, Any]) -> Dict[str, Any]:
         """Generate comprehensive memory content analysis report."""

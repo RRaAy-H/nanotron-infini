@@ -27,6 +27,127 @@ from transformers import AutoTokenizer
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+# Import formal plotting style configuration
+try:
+    from formal_plot_style import (
+        ACADEMIC_COLORS, save_plotly_figure, save_matplotlib_figure,
+        create_comparison_colors, create_significance_colors, 
+        create_effect_size_colors, add_significance_annotations
+    )
+except ImportError:
+    print("⚠️  Warning: formal_plot_style module not found. Using default styling.")
+    # Fallback colors if formal_plot_style is not available
+    ACADEMIC_COLORS = {
+        'memory_enabled': '#1f77b4',
+        'memory_disabled': '#d62728',
+        'improvement': '#2ca02c',
+        'degradation': '#d62728',
+        'neutral': '#7f7f7f',
+        'significant': '#ff7f0e'
+    }
+    
+    def save_plotly_figure(fig, output_path, html_filename, vector_filename, width=1200, height=800, 
+                          vector_format='pdf', include_png=False):
+        """Fallback function if formal_plot_style is not available."""
+        output_path.mkdir(parents=True, exist_ok=True)
+        saved_files = []
+        
+        # Save HTML
+        html_path = output_path / f"{html_filename}.html"
+        fig.write_html(str(html_path))
+        saved_files.append(str(html_path))
+        
+        # Try vector format first
+        try:
+            vector_path = output_path / f"{vector_filename}.{vector_format}"
+            fig.write_image(str(vector_path), format=vector_format, width=width, height=height)
+            saved_files.append(str(vector_path))
+        except Exception as e:
+            print(f"Warning: Could not save {vector_format} image: {e}")
+            # Fallback to PNG
+            try:
+                png_path = output_path / f"{vector_filename}.png"
+                fig.write_image(str(png_path), width=width, height=height, scale=2)
+                saved_files.append(str(png_path))
+            except Exception as png_e:
+                print(f"Warning: PNG fallback also failed: {png_e}")
+        
+        return saved_files
+    
+    def save_matplotlib_figure(fig, output_path, filename, figsize=(12, 8), vector_format='pdf', 
+                              include_png=False, dpi=300):
+        """Fallback function if formal_plot_style is not available."""
+        output_path.mkdir(parents=True, exist_ok=True)
+        fig.set_size_inches(figsize)
+        
+        # Try vector format first
+        try:
+            vector_path = output_path / f"{filename}.{vector_format}"
+            fig.savefig(str(vector_path), format=vector_format, bbox_inches='tight', facecolor='white')
+            return str(vector_path)
+        except Exception as e:
+            print(f"Warning: Could not save {vector_format} format: {e}")
+            # Fallback to PNG
+            try:
+                png_path = output_path / f"{filename}.png"
+                fig.savefig(str(png_path), dpi=dpi, bbox_inches='tight', facecolor='white')
+                return str(png_path)
+            except Exception as png_e:
+                print(f"Warning: PNG fallback also failed: {png_e}")
+                return None
+    
+    def create_comparison_colors(values, threshold=0.0):
+        """Fallback function if formal_plot_style is not available."""
+        return ['#2ca02c' if v > threshold else '#d62728' if v < threshold else '#7f7f7f' for v in values]
+    
+    def create_significance_colors(p_values):
+        """Fallback function if formal_plot_style is not available."""
+        colors = []
+        for p in p_values:
+            if p < 0.001:
+                colors.append('#006400')
+            elif p < 0.01:
+                colors.append('#2ca02c') 
+            elif p < 0.05:
+                colors.append('#ff7f0e')
+            else:
+                colors.append('#d62728')
+        return colors
+    
+    def create_effect_size_colors(effect_sizes):
+        """Fallback function if formal_plot_style is not available."""
+        colors = []
+        for es in effect_sizes:
+            abs_es = abs(es)
+            if abs_es >= 0.8:
+                colors.append('#006400')
+            elif abs_es >= 0.5:
+                colors.append('#2ca02c')
+            elif abs_es >= 0.2:
+                colors.append('#ff7f0e')
+            else:
+                colors.append('#d62728')
+        return colors
+    
+    def add_significance_annotations(fig, x_values, y_values, p_values):
+        """Fallback function if formal_plot_style is not available."""
+        annotations = []
+        for x, y, p in zip(x_values, y_values, p_values):
+            if p < 0.001:
+                symbol = '***'
+            elif p < 0.01:
+                symbol = '**'
+            elif p < 0.05:
+                symbol = '*'
+            else:
+                symbol = 'ns'
+            
+            annotations.append(
+                dict(x=x, y=y + 0.02, text=symbol, showarrow=False, font=dict(size=10))
+            )
+        
+        fig.update_layout(annotations=annotations)
+
 # Import nanotron components
 import sys
 sys.path.append('src')
@@ -468,39 +589,49 @@ class MemoryComparison:
             return f"NO_SIGNIFICANT_DIFFERENCE: {direction} with {effect_magnitude} effect"
     
     def create_visualizations(self, results: List[ComparisonResult]) -> List[str]:
-        """Create comprehensive visualizations."""
+        """Create comprehensive visualizations with formal academic styling."""
         
         viz_files = []
         
+        print("  Creating formal publication-ready visualizations...")
+        
         # 1. Performance comparison plot
         fig = self._create_performance_plot(results)
-        perf_path = self.output_dir / "performance_comparison.html"
-        fig.write_html(str(perf_path))
-        viz_files.append(str(perf_path))
+        files = save_plotly_figure(
+            fig, self.output_dir, 
+            "performance_comparison", "performance_comparison_plot",
+            width=1200, height=700, vector_format='pdf'
+        )
+        viz_files.extend(files)
         
         # 2. Statistical significance plot
         fig = self._create_significance_plot(results)
-        sig_path = self.output_dir / "statistical_significance.html"
-        fig.write_html(str(sig_path))
-        viz_files.append(str(sig_path))
+        files = save_plotly_figure(
+            fig, self.output_dir,
+            "statistical_significance", "statistical_significance_plot", 
+            width=1200, height=700, vector_format='pdf'
+        )
+        viz_files.extend(files)
         
         # 3. Effect size analysis
         fig = self._create_effect_size_plot(results)
-        effect_path = self.output_dir / "effect_size_analysis.html"
-        fig.write_html(str(effect_path))
-        viz_files.append(str(effect_path))
+        files = save_plotly_figure(
+            fig, self.output_dir,
+            "effect_size_analysis", "effect_size_analysis_plot",
+            width=1200, height=700, vector_format='pdf'
+        )
+        viz_files.extend(files)
         
         # 4. Static plots for publications
-        self._create_publication_plots(results)
-        viz_files.extend([
-            str(self.output_dir / "comparison_static.png"),
-            str(self.output_dir / "statistical_analysis_static.png")
-        ])
+        static_files = self._create_publication_plots(results)
+        viz_files.extend(static_files)
+        
+        print(f"  Generated {len(viz_files)} visualization files")
         
         return viz_files
     
     def _create_performance_plot(self, results: List[ComparisonResult]):
-        """Create performance comparison plot."""
+        """Create performance comparison plot with formal academic styling."""
         
         context_lengths = [r.context_length for r in results]
         with_memory_means = [r.statistical_test['with_memory_mean'] for r in results]
@@ -510,208 +641,438 @@ class MemoryComparison:
         
         fig = go.Figure()
         
-        # With memory
+        # With memory - using academic color scheme
         fig.add_trace(go.Scatter(
             x=context_lengths,
             y=with_memory_means,
-            error_y=dict(type='data', array=with_memory_stds, visible=True),
+            error_y=dict(
+                type='data', 
+                array=with_memory_stds, 
+                visible=True,
+                color=ACADEMIC_COLORS['memory_enabled'],
+                thickness=2,
+                width=4
+            ),
             mode='lines+markers',
-            name='With Memory',
-            line=dict(color='blue', width=3),
-            marker=dict(size=8)
+            name='With Infini-Attention Memory',
+            line=dict(color=ACADEMIC_COLORS['memory_enabled'], width=3),
+            marker=dict(size=10, symbol='circle', line=dict(width=2, color='white'))
         ))
         
-        # Without memory
+        # Without memory - using academic color scheme
         fig.add_trace(go.Scatter(
             x=context_lengths,
             y=without_memory_means,
-            error_y=dict(type='data', array=without_memory_stds, visible=True),
+            error_y=dict(
+                type='data', 
+                array=without_memory_stds, 
+                visible=True,
+                color=ACADEMIC_COLORS['memory_disabled'],
+                thickness=2,
+                width=4
+            ),
             mode='lines+markers',
-            name='Without Memory',
-            line=dict(color='red', width=3),
-            marker=dict(size=8)
+            name='Without Memory (Baseline)',
+            line=dict(color=ACADEMIC_COLORS['memory_disabled'], width=3),
+            marker=dict(size=10, symbol='square', line=dict(width=2, color='white'))
         ))
         
         fig.update_layout(
-            title='Performance Comparison: Memory vs No Memory',
-            xaxis_title='Context Length (tokens)',
-            yaxis_title='Accuracy',
-            yaxis=dict(range=[0, 1]),
-            legend=dict(x=0.7, y=0.95),
-            width=800,
-            height=500
+            title=dict(
+                text='Memory Mechanism Performance Comparison',
+                font=dict(size=18, family='Times New Roman'),
+                x=0.5,
+                xanchor='center'
+            ),
+            xaxis=dict(
+                title='Context Length (tokens)',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+            ),
+            yaxis=dict(
+                title='Task Accuracy',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                range=[0, 1.05],
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+            ),
+            legend=dict(
+                x=0.02, 
+                y=0.98,
+                bgcolor='rgba(255,255,255,0.9)',
+                bordercolor='black',
+                borderwidth=1,
+                font=dict(size=12, family='Times New Roman')
+            ),
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=80, r=50, t=80, b=60)
         )
         
         return fig
     
     def _create_significance_plot(self, results: List[ComparisonResult]):
-        """Create statistical significance visualization."""
+        """Create statistical significance visualization with formal academic styling."""
         
         context_lengths = [r.context_length for r in results]
         p_values = [r.statistical_test['p_value'] for r in results]
         
-        # Create significance categories
-        sig_colors = []
+        # Use formal color scheme for significance levels
+        sig_colors = create_significance_colors(p_values)
+        
+        # Create significance labels
         sig_labels = []
         for p in p_values:
             if p < 0.001:
-                sig_colors.append('darkgreen')
-                sig_labels.append('p < 0.001 (Highly Significant)')
+                sig_labels.append('p < 0.001')
             elif p < 0.01:
-                sig_colors.append('green')
-                sig_labels.append('p < 0.01 (Very Significant)')
+                sig_labels.append('p < 0.01')
             elif p < 0.05:
-                sig_colors.append('orange')
-                sig_labels.append('p < 0.05 (Significant)')
+                sig_labels.append('p < 0.05')
             else:
-                sig_colors.append('red')
-                sig_labels.append('p ≥ 0.05 (Not Significant)')
+                sig_labels.append('p ≥ 0.05')
         
         fig = go.Figure()
         
+        # Create bar plot with significance colors
         fig.add_trace(go.Bar(
             x=context_lengths,
             y=[-np.log10(p) for p in p_values],
-            marker_color=sig_colors,
+            marker=dict(
+                color=sig_colors,
+                line=dict(color='black', width=1)
+            ),
             text=sig_labels,
             textposition='outside',
-            name='Statistical Significance'
+            textfont=dict(size=11, family='Times New Roman'),
+            name='Statistical Significance',
+            showlegend=False
         ))
         
-        # Add significance threshold lines
-        fig.add_hline(y=-np.log10(0.05), line_dash="dash", line_color="orange", 
-                     annotation_text="p = 0.05 threshold")
-        fig.add_hline(y=-np.log10(0.01), line_dash="dash", line_color="green",
-                     annotation_text="p = 0.01 threshold")
+        # Add significance threshold lines with formal styling
+        fig.add_hline(
+            y=-np.log10(0.05), 
+            line_dash="dash", 
+            line_color=ACADEMIC_COLORS['significant'], 
+            line_width=2,
+            annotation_text="α = 0.05",
+            annotation_position="top right",
+            annotation_font=dict(size=12, family='Times New Roman')
+        )
+        fig.add_hline(
+            y=-np.log10(0.01), 
+            line_dash="dash", 
+            line_color=ACADEMIC_COLORS['improvement'], 
+            line_width=2,
+            annotation_text="α = 0.01",
+            annotation_position="top right",
+            annotation_font=dict(size=12, family='Times New Roman')
+        )
+        fig.add_hline(
+            y=-np.log10(0.001), 
+            line_dash="dash", 
+            line_color='#006400', 
+            line_width=2,
+            annotation_text="α = 0.001",
+            annotation_position="top right",
+            annotation_font=dict(size=12, family='Times New Roman')
+        )
         
         fig.update_layout(
-            title='Statistical Significance of Memory Effect',
-            xaxis_title='Context Length (tokens)',
-            yaxis_title='-log10(p-value)',
+            title=dict(
+                text='Statistical Significance of Memory Effect',
+                font=dict(size=18, family='Times New Roman'),
+                x=0.5,
+                xanchor='center'
+            ),
+            xaxis=dict(
+                title='Context Length (tokens)',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+            ),
+            yaxis=dict(
+                title='-log₁₀(p-value)',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+            ),
             showlegend=False,
-            width=800,
-            height=500
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=80, r=50, t=80, b=60)
         )
         
         return fig
     
     def _create_effect_size_plot(self, results: List[ComparisonResult]):
-        """Create effect size visualization."""
+        """Create effect size visualization with formal academic styling."""
         
         context_lengths = [r.context_length for r in results]
         effect_sizes = [r.effect_size for r in results]
         
-        # Color code by effect size magnitude
-        colors = []
+        # Use formal color scheme for effect sizes
+        colors = create_effect_size_colors(effect_sizes)
+        
+        # Create effect size labels
+        effect_labels = []
         for es in effect_sizes:
-            if abs(es) >= 0.8:
-                colors.append('darkgreen')
-            elif abs(es) >= 0.5:
-                colors.append('green')
-            elif abs(es) >= 0.2:
-                colors.append('orange')
+            abs_es = abs(es)
+            if abs_es >= 0.8:
+                effect_labels.append('Large')
+            elif abs_es >= 0.5:
+                effect_labels.append('Medium')
+            elif abs_es >= 0.2:
+                effect_labels.append('Small')
             else:
-                colors.append('red')
+                effect_labels.append('Negligible')
         
         fig = go.Figure()
         
+        # Create bar plot with effect size colors
         fig.add_trace(go.Bar(
             x=context_lengths,
             y=effect_sizes,
-            marker_color=colors,
-            name='Effect Size (Cohen\'s d)'
+            marker=dict(
+                color=colors,
+                line=dict(color='black', width=1)
+            ),
+            text=[f'd = {es:.2f}' for es in effect_sizes],
+            textposition='outside',
+            textfont=dict(size=11, family='Times New Roman'),
+            name='Effect Size (Cohen\'s d)',
+            showlegend=False
         ))
         
-        # Add effect size interpretation lines
-        fig.add_hline(y=0.2, line_dash="dash", line_color="orange",
-                     annotation_text="Small effect (0.2)")
-        fig.add_hline(y=0.5, line_dash="dash", line_color="green",
-                     annotation_text="Medium effect (0.5)")
-        fig.add_hline(y=0.8, line_dash="dash", line_color="darkgreen",
-                     annotation_text="Large effect (0.8)")
-        fig.add_hline(y=-0.2, line_dash="dash", line_color="orange")
-        fig.add_hline(y=-0.5, line_dash="dash", line_color="green")
-        fig.add_hline(y=-0.8, line_dash="dash", line_color="darkgreen")
+        # Add effect size interpretation lines with formal styling
+        fig.add_hline(
+            y=0.2, 
+            line_dash="dash", 
+            line_color=ACADEMIC_COLORS['significant'], 
+            line_width=2,
+            annotation_text="Small effect (d = 0.2)",
+            annotation_position="top right",
+            annotation_font=dict(size=11, family='Times New Roman')
+        )
+        fig.add_hline(
+            y=0.5, 
+            line_dash="dash", 
+            line_color=ACADEMIC_COLORS['improvement'], 
+            line_width=2,
+            annotation_text="Medium effect (d = 0.5)",
+            annotation_position="top right",
+            annotation_font=dict(size=11, family='Times New Roman')
+        )
+        fig.add_hline(
+            y=0.8, 
+            line_dash="dash", 
+            line_color='#006400', 
+            line_width=2,
+            annotation_text="Large effect (d = 0.8)",
+            annotation_position="top right",
+            annotation_font=dict(size=11, family='Times New Roman')
+        )
+        
+        # Add zero line
+        fig.add_hline(
+            y=0, 
+            line_color='black', 
+            line_width=1,
+            annotation_text="No effect",
+            annotation_position="top left",
+            annotation_font=dict(size=11, family='Times New Roman')
+        )
+        
+        # Add negative effect lines (mirror of positive)
+        fig.add_hline(y=-0.2, line_dash="dash", line_color=ACADEMIC_COLORS['significant'], line_width=2)
+        fig.add_hline(y=-0.5, line_dash="dash", line_color=ACADEMIC_COLORS['improvement'], line_width=2)
+        fig.add_hline(y=-0.8, line_dash="dash", line_color='#006400', line_width=2)
         
         fig.update_layout(
-            title='Effect Size of Memory Mechanism',
-            xaxis_title='Context Length (tokens)',
-            yaxis_title='Effect Size (Cohen\'s d)',
+            title=dict(
+                text='Effect Size of Memory Mechanism (Cohen\'s d)',
+                font=dict(size=18, family='Times New Roman'),
+                x=0.5,
+                xanchor='center'
+            ),
+            xaxis=dict(
+                title='Context Length (tokens)',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black'
+            ),
+            yaxis=dict(
+                title='Effect Size (Cohen\'s d)',
+                title_font=dict(size=14, family='Times New Roman'),
+                tickfont=dict(size=12, family='Times New Roman'),
+                showgrid=True,
+                gridwidth=1,
+                gridcolor='lightgray',
+                showline=True,
+                linewidth=2,
+                linecolor='black',
+                zeroline=True,
+                zerolinecolor='black',
+                zerolinewidth=2
+            ),
             showlegend=False,
-            width=800,
-            height=500
+            plot_bgcolor='white',
+            paper_bgcolor='white',
+            margin=dict(l=80, r=50, t=80, b=60)
         )
         
         return fig
     
     def _create_publication_plots(self, results: List[ComparisonResult]):
-        """Create static plots for publications."""
+        """Create static plots for publications with formal academic styling."""
         
-        plt.style.use('seaborn-v0_8')
+        created_files = []
         
-        # Performance comparison
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
-        
+        # Extract data
         context_lengths = [r.context_length for r in results]
         with_memory_means = [r.statistical_test['with_memory_mean'] for r in results]
         without_memory_means = [r.statistical_test['without_memory_mean'] for r in results]
         with_memory_stds = [r.statistical_test['with_memory_std'] for r in results]
         without_memory_stds = [r.statistical_test['without_memory_std'] for r in results]
-        
-        ax1.errorbar(context_lengths, with_memory_means, yerr=with_memory_stds,
-                    marker='o', linewidth=2, label='With Memory', color='blue')
-        ax1.errorbar(context_lengths, without_memory_means, yerr=without_memory_stds,
-                    marker='s', linewidth=2, label='Without Memory', color='red')
-        ax1.set_xlabel('Context Length (tokens)')
-        ax1.set_ylabel('Accuracy')
-        ax1.set_title('Performance Comparison')
-        ax1.legend()
-        ax1.grid(True, alpha=0.3)
-        ax1.set_ylim(0, 1)
-        
-        # Effect sizes
         effect_sizes = [r.effect_size for r in results]
-        colors = ['darkgreen' if abs(es) >= 0.8 else 'green' if abs(es) >= 0.5 
-                 else 'orange' if abs(es) >= 0.2 else 'red' for es in effect_sizes]
+        p_values = [r.statistical_test['p_value'] for r in results]
         
-        bars = ax2.bar(context_lengths, effect_sizes, color=colors, alpha=0.7)
-        ax2.axhline(y=0.2, linestyle='--', color='orange', alpha=0.7, label='Small effect')
-        ax2.axhline(y=0.5, linestyle='--', color='green', alpha=0.7, label='Medium effect')
-        ax2.axhline(y=0.8, linestyle='--', color='darkgreen', alpha=0.7, label='Large effect')
-        ax2.axhline(y=0, linestyle='-', color='black', alpha=0.5)
-        ax2.set_xlabel('Context Length (tokens)')
-        ax2.set_ylabel('Effect Size (Cohen\'s d)')
-        ax2.set_title('Effect Size Analysis')
-        ax2.legend()
-        ax2.grid(True, alpha=0.3)
+        # Performance comparison and effect size analysis
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+        
+        # Performance comparison (left subplot)
+        ax1.errorbar(
+            context_lengths, with_memory_means, yerr=with_memory_stds,
+            marker='o', linewidth=3, markersize=8, capsize=5, capthick=2,
+            label='With Infini-Attention Memory', 
+            color=ACADEMIC_COLORS['memory_enabled']
+        )
+        ax1.errorbar(
+            context_lengths, without_memory_means, yerr=without_memory_stds,
+            marker='s', linewidth=3, markersize=8, capsize=5, capthick=2,
+            label='Without Memory (Baseline)', 
+            color=ACADEMIC_COLORS['memory_disabled']
+        )
+        
+        ax1.set_xlabel('Context Length (tokens)', fontsize=14, fontweight='bold')
+        ax1.set_ylabel('Task Accuracy', fontsize=14, fontweight='bold')
+        ax1.set_title('(a) Memory Mechanism Performance', fontsize=14, fontweight='bold')
+        ax1.legend(fontsize=12, frameon=True, fancybox=True, shadow=True)
+        ax1.grid(True, alpha=0.3, linewidth=0.8)
+        ax1.set_ylim(0, 1)
+        ax1.tick_params(axis='both', which='major', labelsize=12)
+        
+        # Effect sizes (right subplot)
+        colors = create_effect_size_colors(effect_sizes)
+        bars = ax2.bar(context_lengths, effect_sizes, color=colors, alpha=0.8, 
+                      edgecolor='black', linewidth=1)
+        
+        # Add effect size reference lines
+        ax2.axhline(y=0.2, linestyle='--', color=ACADEMIC_COLORS['significant'], 
+                   alpha=0.8, linewidth=2, label='Small effect (d = 0.2)')
+        ax2.axhline(y=0.5, linestyle='--', color=ACADEMIC_COLORS['improvement'], 
+                   alpha=0.8, linewidth=2, label='Medium effect (d = 0.5)')
+        ax2.axhline(y=0.8, linestyle='--', color='#006400', 
+                   alpha=0.8, linewidth=2, label='Large effect (d = 0.8)')
+        ax2.axhline(y=0, linestyle='-', color='black', alpha=0.7, linewidth=1)
+        
+        # Add value labels on bars
+        for bar, es in zip(bars, effect_sizes):
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., 
+                    height + (0.02 if height >= 0 else -0.02),
+                    f'{es:.2f}', ha='center', 
+                    va='bottom' if height >= 0 else 'top', 
+                    fontsize=10, fontweight='bold')
+        
+        ax2.set_xlabel('Context Length (tokens)', fontsize=14, fontweight='bold')
+        ax2.set_ylabel('Effect Size (Cohen\'s d)', fontsize=14, fontweight='bold')
+        ax2.set_title('(b) Effect Size Analysis', fontsize=14, fontweight='bold')
+        ax2.legend(fontsize=10, frameon=True, fancybox=True, shadow=True, loc='upper right')
+        ax2.grid(True, alpha=0.3, linewidth=0.8)
+        ax2.tick_params(axis='both', which='major', labelsize=12)
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / "comparison_static.png", dpi=300, bbox_inches='tight')
+        file_path = save_matplotlib_figure(fig, self.output_dir, "memory_comparison_analysis", 
+                                         figsize=(16, 6), vector_format='pdf')
+        if file_path:
+            created_files.append(file_path)
         plt.close()
         
         # Statistical significance plot
-        fig, ax = plt.subplots(figsize=(10, 6))
+        fig, ax = plt.subplots(figsize=(12, 8))
         
-        p_values = [r.statistical_test['p_value'] for r in results]
         log_p_values = [-np.log10(p) for p in p_values]
+        sig_colors = create_significance_colors(p_values)
         
-        sig_colors = ['darkgreen' if p < 0.001 else 'green' if p < 0.01 
-                     else 'orange' if p < 0.05 else 'red' for p in p_values]
+        bars = ax.bar(context_lengths, log_p_values, color=sig_colors, alpha=0.8,
+                     edgecolor='black', linewidth=1)
         
-        bars = ax.bar(context_lengths, log_p_values, color=sig_colors, alpha=0.7)
-        ax.axhline(y=-np.log10(0.05), linestyle='--', color='orange', label='p = 0.05')
-        ax.axhline(y=-np.log10(0.01), linestyle='--', color='green', label='p = 0.01')
-        ax.axhline(y=-np.log10(0.001), linestyle='--', color='darkgreen', label='p = 0.001')
+        # Add significance threshold lines
+        ax.axhline(y=-np.log10(0.05), linestyle='--', color=ACADEMIC_COLORS['significant'], 
+                  linewidth=2, alpha=0.8, label='α = 0.05')
+        ax.axhline(y=-np.log10(0.01), linestyle='--', color=ACADEMIC_COLORS['improvement'], 
+                  linewidth=2, alpha=0.8, label='α = 0.01')
+        ax.axhline(y=-np.log10(0.001), linestyle='--', color='#006400', 
+                  linewidth=2, alpha=0.8, label='α = 0.001')
         
-        ax.set_xlabel('Context Length (tokens)')
-        ax.set_ylabel('-log10(p-value)')
-        ax.set_title('Statistical Significance of Memory Effect')
-        ax.legend()
-        ax.grid(True, alpha=0.3)
+        # Add significance annotations
+        for bar, p in zip(bars, p_values):
+            height = bar.get_height()
+            if p < 0.001:
+                symbol = '***'
+            elif p < 0.01:
+                symbol = '**'
+            elif p < 0.05:
+                symbol = '*'
+            else:
+                symbol = 'ns'
+            
+            ax.text(bar.get_x() + bar.get_width()/2., height + 0.1,
+                   symbol, ha='center', va='bottom', 
+                   fontsize=14, fontweight='bold')
+        
+        ax.set_xlabel('Context Length (tokens)', fontsize=14, fontweight='bold')
+        ax.set_ylabel('-log₁₀(p-value)', fontsize=14, fontweight='bold')
+        ax.set_title('Statistical Significance of Memory Effect', fontsize=16, fontweight='bold')
+        ax.legend(fontsize=12, frameon=True, fancybox=True, shadow=True)
+        ax.grid(True, alpha=0.3, linewidth=0.8)
+        ax.tick_params(axis='both', which='major', labelsize=12)
         
         plt.tight_layout()
-        plt.savefig(self.output_dir / "statistical_analysis_static.png", dpi=300, bbox_inches='tight')
+        file_path = save_matplotlib_figure(fig, self.output_dir, "statistical_significance_analysis", 
+                                         figsize=(12, 8), vector_format='pdf')
+        if file_path:
+            created_files.append(file_path)
         plt.close()
+        
+        return created_files
     
     def generate_comprehensive_report(self, results: List[ComparisonResult]) -> Dict[str, Any]:
         """Generate comprehensive comparison report."""
