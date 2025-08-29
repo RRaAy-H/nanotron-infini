@@ -74,7 +74,7 @@ def setup_matplotlib_style():
         'figure.figsize': (10, 6),
         'figure.dpi': 100,
         'savefig.dpi': 300,
-        'savefig.bbox': 'tight',
+        # Note: savefig.bbox removed - not a valid rcParam
         'savefig.pad_inches': 0.1,
         'savefig.facecolor': 'white',
         'savefig.edgecolor': 'none',
@@ -125,7 +125,6 @@ def setup_matplotlib_style():
         
         # Error bar settings
         'errorbar.capsize': 4,
-        'errorbar.capthick': 1,
     })
 
 def get_plotly_template():
