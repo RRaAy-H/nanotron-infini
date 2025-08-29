@@ -584,6 +584,9 @@ class BalanceFactorAnalyzer:
         ax.set_title('Balance Factors by Layer and Head', fontsize=14, fontweight='bold')
         ax.tick_params(axis='both', which='major', labelsize=10)
         
+        # Remove grid for clean heatmap appearance
+        ax.grid(False)
+        
         # Add text annotations for each cell (similar to reference image)
         for i in range(self.global_weights.shape[0]):
             for j in range(self.global_weights.shape[1]):
