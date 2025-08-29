@@ -389,7 +389,9 @@ class BalanceFactorAnalyzer:
         fig.update_layout(
             title_text="Balance Factor Analysis",
             height=500,
-            showlegend=False
+            showlegend=False,
+            plot_bgcolor='white',
+            paper_bgcolor='white'
         )
         
         fig.update_xaxes(title_text='Balance Factor Value', range=[0, 1], row=1, col=1)
@@ -406,7 +408,7 @@ class BalanceFactorAnalyzer:
             z=self.global_weights,
             x=[f'Head {i}' for i in range(num_heads)],
             y=[f'Layer {i}' for i in range(num_layers)],
-            colorscale='RdYlBu_r',
+            colorscale='Reds',
             colorbar=dict(title='Balance Factor (0=Attention, 1=Memory)'),
             zmin=0,
             zmax=1,
@@ -420,10 +422,10 @@ class BalanceFactorAnalyzer:
                 fig.add_annotation(
                     x=head,
                     y=layer,
-                    text=f'{value:.2f}',
+                    text=f'{value:.1f}',
                     showarrow=False,
                     font=dict(
-                        color='white' if 0.3 <= value <= 0.7 else 'black',
+                        color='white' if value > 0.5 else 'black',
                         size=8
                     )
                 )
@@ -434,7 +436,9 @@ class BalanceFactorAnalyzer:
             yaxis_title='Layer',
             width=max(800, num_heads * 40),
             height=max(600, num_layers * 25),
-            yaxis=dict(autorange='reversed')
+            yaxis=dict(autorange='reversed'),
+            plot_bgcolor='white',
+            paper_bgcolor='white'
         )
         
         return fig
@@ -488,7 +492,9 @@ class BalanceFactorAnalyzer:
         fig.update_layout(
             title='Layer-wise Balance Factor Analysis',
             height=800,
-            showlegend=False
+            showlegend=False,
+            plot_bgcolor='white',
+            paper_bgcolor='white'
         )
         
         # Update axis labels
@@ -512,7 +518,10 @@ class BalanceFactorAnalyzer:
         flat_weights = self.global_weights.flatten()
         
         # 1. Distribution histogram
-        fig, ax = plt.subplots(1, 1, figsize=(8, 6))
+        fig, ax = plt.subplots(1, 1, figsize=(8, 6), facecolor='white')
+        fig.patch.set_facecolor('white')
+        ax.set_facecolor('white')
+        
         ax.hist(flat_weights, bins=20, alpha=0.8, color=ACADEMIC_COLORS['primary_blue'], 
                edgecolor='black', linewidth=1)
         ax.set_xlabel('Balance Factor Value', fontsize=12, fontweight='bold')
@@ -524,13 +533,22 @@ class BalanceFactorAnalyzer:
         ax.grid(True, alpha=0.3)
         ax.tick_params(axis='both', which='major', labelsize=10)
         
+        # Ensure white background
+        ax.spines['top'].set_visible(True)
+        ax.spines['right'].set_visible(True)
+        ax.spines['bottom'].set_color('black')
+        ax.spines['left'].set_color('black')
+        
         plt.tight_layout()
         file_path = save_matplotlib_figure(fig, self.output_dir, "balance_factor_distribution", 
                                          figsize=(8, 6), vector_format='pdf')
         plt.close()
         
         # 2. Memory vs Attention Preference pie chart
-        fig, ax = plt.subplots(1, 1, figsize=(8, 8))
+        fig, ax = plt.subplots(1, 1, figsize=(8, 8), facecolor='white')
+        fig.patch.set_facecolor('white')
+        ax.set_facecolor('white')
+        
         memory_count = (flat_weights >= 0.5).sum()
         attention_count = (flat_weights < 0.5).sum()
         
@@ -554,13 +572,26 @@ class BalanceFactorAnalyzer:
         
         # 3. Balance factors heatmap
         fig, ax = plt.subplots(figsize=(max(8, self.global_weights.shape[1] * 0.3), 
-                                       max(6, self.global_weights.shape[0] * 0.2)))
+                                       max(6, self.global_weights.shape[0] * 0.2)), 
+                              facecolor='white')
+        fig.patch.set_facecolor('white')
+        ax.set_facecolor('white')
         
-        im = ax.imshow(self.global_weights, cmap='RdYlBu_r', aspect='auto', vmin=0, vmax=1)
+        # Use white-to-red colormap to match the reference image
+        im = ax.imshow(self.global_weights, cmap='Reds', aspect='auto', vmin=0, vmax=1)
         ax.set_xlabel('Attention Head', fontsize=12, fontweight='bold')
         ax.set_ylabel('Layer', fontsize=12, fontweight='bold')
         ax.set_title('Balance Factors by Layer and Head', fontsize=14, fontweight='bold')
         ax.tick_params(axis='both', which='major', labelsize=10)
+        
+        # Add text annotations for each cell (similar to reference image)
+        for i in range(self.global_weights.shape[0]):
+            for j in range(self.global_weights.shape[1]):
+                value = self.global_weights[i, j]
+                # Use black text for light values, white text for dark values
+                text_color = 'white' if value > 0.5 else 'black'
+                ax.text(j, i, f'{value:.1f}', ha='center', va='center', 
+                       color=text_color, fontweight='bold', fontsize=8)
         
         # Add colorbar
         cbar = plt.colorbar(im, ax=ax)
@@ -578,7 +609,12 @@ class BalanceFactorAnalyzer:
         layer_stds = np.std(self.global_weights, axis=1)
         layers = list(range(len(layer_means)))
         
-        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8))
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 8), facecolor='white')
+        fig.patch.set_facecolor('white')
+        
+        # Set white background for both subplots
+        ax1.set_facecolor('white')
+        ax2.set_facecolor('white')
         
         ax1.plot(layers, layer_means, 'o-', color=ACADEMIC_COLORS['primary_blue'], 
                 linewidth=2, markersize=6, label='Mean')

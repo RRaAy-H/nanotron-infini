@@ -85,6 +85,11 @@ def setup_matplotlib_style():
         'axes.axisbelow': True,
         'axes.facecolor': 'white',
         'axes.edgecolor': 'black',
+        'figure.facecolor': 'white',
+        'axes.spines.left': True,
+        'axes.spines.bottom': True,
+        'axes.spines.top': True,
+        'axes.spines.right': True,
         'axes.prop_cycle': mpl.cycler('color', [
             ACADEMIC_COLORS['primary_blue'],
             ACADEMIC_COLORS['primary_red'],
