@@ -99,6 +99,20 @@ def get_dataloader_from_data_stage(trainer: DistributedTrainer, data: DataArgs):
                 sequence_length=trainer.sequence_length,
             )
 
+            # Handle case where consumed samples exceed dataset size (e.g., when resuming 
+            # from checkpoint with a much smaller finetuning dataset)
+            dataset_size = len(train_dataset)
+            effective_consumed_samples = trainer.consumed_train_samples % dataset_size if dataset_size > 0 else 0
+            
+            if trainer.consumed_train_samples > dataset_size and dataset_size > 0:
+                log_rank(
+                    f"WARNING: consumed_train_samples ({trainer.consumed_train_samples}) > dataset_size ({dataset_size}). "
+                    f"Using modulo to restart from sample {effective_consumed_samples}",
+                    logger=logger,
+                    level=logging.WARNING,
+                    rank=0,
+                )
+            
             # We load the processed dataset on the ranks requiring it
             dataloader = get_train_dataloader(
                 train_dataset=train_dataset,
@@ -107,7 +121,7 @@ def get_dataloader_from_data_stage(trainer: DistributedTrainer, data: DataArgs):
                 input_pp_rank=input_pp_rank,
                 output_pp_rank=output_pp_rank,
                 micro_batch_size=trainer.micro_batch_size,
-                consumed_train_samples=trainer.consumed_train_samples,
+                consumed_train_samples=effective_consumed_samples,
                 dataloader_num_workers=data.num_loading_workers,
                 seed_worker=data.seed,
                 dataloader_drop_last=True,
@@ -120,8 +134,7 @@ def get_dataloader_from_data_stage(trainer: DistributedTrainer, data: DataArgs):
                 * trainer.sequence_length
             )
 
-            if num_tokens_needed_for_training <= total_tokens_dataset:
-                print("intentionally skipping this step for repeat 33 epochs")
+            if num_tokens_needed_for_training > total_tokens_dataset:
                 print(
                     f"Dataset is too small for steps ({total_tokens_dataset} < {num_tokens_needed_for_training}), "
                     f"Try train_steps<={len(dataloader.dataset) // trainer.global_batch_size + trainer.start_iteration_step}"
