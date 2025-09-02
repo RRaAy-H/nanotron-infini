@@ -2251,6 +2251,9 @@ def main():
     assert args.ckpt_path.exists(), f"Checkpoint path {args.ckpt_path} does not exist"
 
     config = get_config_from_file((args.ckpt_path / "config.yaml").as_posix())
+    from nanotron import constants
+    
+    constants.CONFIG = config
     model_config = config.model.model_config
     tokenizer_path = config.tokenizer.tokenizer_name_or_path
 
@@ -2329,6 +2332,27 @@ def main():
         rank=0,
     )
     load_weights(model=model, parallel_context=parallel_context, root_folder=checkpoint_path)
+    
+    # Apply balance factor fix for Infini-Attention
+    log_rank("🔧 Applying balance factor fix...", logger=logger, level=logging.INFO, rank=0)
+    
+    # Add root directory to Python path (more robust than relative paths)
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = os.path.join(current_dir, '..', '..')
+    root_dir = os.path.abspath(root_dir)
+    if root_dir not in sys.path:
+        sys.path.insert(0, root_dir)
+    
+    try:
+        from apply_balance_fix_standalone import apply_balance_factor_fix_standalone
+        fix_success = apply_balance_factor_fix_standalone(model, checkpoint_path, verbose=False)
+        if fix_success:
+            log_rank("✅ Balance factors loaded successfully", logger=logger, level=logging.INFO, rank=0)
+        else:
+            log_rank("⚠️  Balance factor fix may not have worked properly", logger=logger, level=logging.WARNING, rank=0)
+    except Exception as e:
+        log_rank(f"⚠️  Balance factor fix failed: {e}", logger=logger, level=logging.WARNING, rank=0)
 
     model.eval()
     if AutoTokenizer is not None:
@@ -2346,13 +2370,14 @@ def main():
         tokenizer.padding_side = "left"
         tokenizer.truncation_side = "left"  # TODO @nouamane: do we want this?
 
-        import wandb
-
-        if dist.get_rank() == 0:
-            wandb.init(
-                project="debug_infini_attention",
-                name="debug_infini_attention",
-            )
+        # Disabled wandb to avoid SSL errors
+        # import wandb
+        #
+        # if dist.get_rank() == 0:
+        #     wandb.init(
+        #         project="debug_infini_attention",
+        #         name="debug_infini_attention",
+        #     )
 
         # dummy_inputs = [
         #     # "Passage: Daniel went back to the garden. Mary travelled to the kitchen. Sandra journeyed to the kitchen. Sandra went to the hallway. John went to the bedroom. Mary went back to the garden. Where is Mary?\nAnswer:",
@@ -2367,16 +2392,23 @@ def main():
 
         # generate(args, model, tokenizer, [HARRY_POTTER], parallel_context)
 
-        # dataset = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
-        # df = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
-        # from datasets import load_dataset
+        from datasets import load_dataset
+        import os
+        
+        # Load dataset from local parquet file
+        # Check if local file exists first
+        local_dataset_path = "nanotron/simple_needle_in_a_hay_stack/train-00000-of-00001.parquet"
+        if os.path.exists(local_dataset_path):
+            dataset = load_dataset("parquet", data_files=local_dataset_path, split="train")
+            df = load_dataset("parquet", data_files=local_dataset_path, split="train")
+        else:
+            # Fallback to downloading if local file doesn't exist
+            dataset = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
+            df = load_dataset("nanotron/simple_needle_in_a_hay_stack", split="train")
 
-        # dataset = load_dataset("lvwerra/needle-llama3-16x512", split="train")
-        # df = load_dataset("lvwerra/needle-llama3-16x512", split="train")
-
-        # NOTE: filter out only samples with context_length is 32768
-        dataset = dataset.filter(lambda x: x["context_length"] == 32768 and x["depth_percent"] == depth_percent)
-        df = df.filter(lambda x: x["context_length"] == 32768 and x["depth_percent"] == depth_percent)
+        # NOTE: filter out only samples with the specified context_length
+        dataset = dataset.filter(lambda x: x["context_length"] == args.context_length and x["depth_percent"] == depth_percent)
+        df = df.filter(lambda x: x["context_length"] == args.context_length and x["depth_percent"] == depth_percent)
 
         dataloader = torch.utils.data.DataLoader(dataset, batch_size=1, shuffle=False)
 
@@ -2388,23 +2420,34 @@ def main():
 
         for batch in tqdm(dataloader):
             print("--------------------------------------------------")
-            print(f"target answer: {batch['answer']}")
-            texts = batch["prompt"]
+            print(f"target answer: {batch['answer'][0]}")  # Using 'answer' field from nanotron dataset
+            texts = batch["prompt"]  # Using 'prompt' field from nanotron dataset
             from nanotron import constants
 
-            constants.NEEDLE = batch["answer"].item()
+            constants.NEEDLE = batch["answer"][0]  # Using 'answer' field
 
             responses.append(generate(args, model, tokenizer, texts, parallel_context))
 
         # NOTE: now flatten the responses
         responses = [response for sublist in responses for response in sublist]
         df["response"] = responses
-        # df["match"] = df.apply(lambda x: int(str(x["needle"]) in x["response"]), axis=1)
-
-        # NOTE: move anything from gpu to cpu in df
-
-        # nOTE: now save df
-        # df.to_pickle(f'needle_finetune_format_dataset_but_for_evals_{context_length}_ctx_and_{depth_percent}_depth.pkl')
+        
+        # Calculate if the model found the needle (answer) in each response
+        df["match"] = df.apply(lambda x: int(str(x["answer"]) in x["response"]), axis=1)
+        
+        # Calculate and print accuracy metrics
+        total_samples = len(df)
+        correct_samples = df["match"].sum()
+        accuracy = (correct_samples / total_samples) * 100 if total_samples > 0 else 0
+        
+        print("\n" + "="*60)
+        print(f"EVALUATION RESULTS")
+        print(f"Context Length: {args.context_length}")
+        print(f"Depth Percent: {depth_percent}%")
+        print(f"Total Samples: {total_samples}")
+        print(f"Correct Predictions: {correct_samples}")
+        print(f"Accuracy: {accuracy:.2f}%")
+        print("="*60 + "\n")
 
     dist.barrier()
 
