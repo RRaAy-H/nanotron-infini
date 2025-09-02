@@ -4,17 +4,12 @@ set -e  # Exit on error
 CHECKPOINT_PATH="${1:-./checkpoints/fineweb_4gpu_300m_infini/30000}"
 CONFIG_FILE="passkey_finetune_300m_optimized_infini_config.yaml"
 
-# Pre-flight checks
-echo "=========================================================="
-echo "PRE-FLIGHT CHECKS"
-echo "=========================================================="
-
 # Check if config file exists
 if [ ! -f "$CONFIG_FILE" ]; then
     echo "ERROR: Configuration file not found: $CONFIG_FILE"
     exit 1
 fi
-echo "✓ Configuration file found: $CONFIG_FILE"
+echo "Configuration file found: $CONFIG_FILE"
 
 # Check if training data exists
 TRAINING_DATA_DIR="/data1/infini-attn/infini-llama/nanotron-infini/finetuning"
@@ -22,7 +17,7 @@ if [ ! -d "$TRAINING_DATA_DIR" ]; then
     echo "ERROR: Training data directory not found: $TRAINING_DATA_DIR"
     exit 1
 fi
-echo "✓ Training data found: $TRAINING_DATA_DIR"
+echo "Training data found: $TRAINING_DATA_DIR"
 
 # Check if run_train.py exists
 if [ ! -f "run_train.py" ]; then
@@ -30,14 +25,8 @@ if [ ! -f "run_train.py" ]; then
     echo "Make sure you're in the correct nanotron directory"
     exit 1
 fi
-echo "✓ Training script found: run_train.py"
+echo "Training script found: run_train.py"
 echo ""
-
-echo "=========================================================="
-echo "OPTIMIZED PASSKEY FINETUNING FOR 300M INFINI-ATTENTION MODEL"
-echo "=========================================================="
-echo "Base checkpoint: $CHECKPOINT_PATH"
-echo "=========================================================="
 
 # Step 1: Check if checkpoint exists
 if [ ! -d "$CHECKPOINT_PATH" ]; then
@@ -95,10 +84,6 @@ torchrun \
 
 # Check if training completed
 if [ $? -eq 0 ]; then
-    echo ""
-    echo "=========================================================="
-    echo "OPTIMIZED PASSKEY FINETUNING COMPLETED SUCCESSFULLY!"
-    echo "=========================================================="
     echo ""
     echo "Checkpoints saved to: ./checkpoints/passkey_finetune_300m_optimized/"
     echo ""
