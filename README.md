@@ -1,6 +1,6 @@
 # Nanotron-Infini
 
-A minimalistic large language model training and fine-tuning framework with **Infini-attention** implementation for handling infinite-length contexts.
+A large language model pre-training and fine-tuning framework with **Infini-attention** implementation.
 
 ## Overview
 
@@ -8,7 +8,7 @@ A distributed training framework that incorporates Infini-attention mechanisms, 
 
 ## Key Features
 
-- **Infini-attention Implementation**: Enables infinite-length context processing with memory-efficient attention mechanisms
+- **Infini-attention Implementation**: Enables "infinite-length" context processing with memory-efficient attention mechanisms
 - **Distributed Training**: Multi-GPU and multi-node training support with tensor, pipeline, and data parallelism  
 - **Model Support**: LLaMA model family with Infini-attention modifications
 - **Flexible Configuration**: YAML-based configuration system for different training scenarios
